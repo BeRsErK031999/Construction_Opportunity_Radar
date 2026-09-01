@@ -1,0 +1,42 @@
+# Dependencies and builds
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+.cache/
+.pnpm-store/
+.eslintcache
+*.tsbuildinfo
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data
+logs/
+tmp/
+backups/
+*.log
+*.pid
+*.session
+*.session-journal
+
+# Local databases and model artifacts
+*.db
+*.sqlite
+*.sqlite3
+models/
+.ollama/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Codex local diagnostics
+.codex-log/

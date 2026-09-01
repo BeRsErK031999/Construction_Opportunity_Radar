@@ -1,0 +1,4 @@
+interface:
+  display_name: "Construction Radar Product"
+  short_description: "Scope, priorities, roles, gates, and KPIs"
+  default_prompt: "Use $construction-radar-product to refine the MVP scope and update the roadmap."

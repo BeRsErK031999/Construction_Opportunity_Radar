@@ -1,0 +1,266 @@
+# MVP architecture
+
+## Architecture goals
+
+- develop and test the complete product without the target inference computer;
+- reliable restart and recovery on one small deployment;
+- traceability from source to delivered recommendation and feedback;
+- explicit legal/rights boundary before AI processing;
+- inexpensive filtering before model work;
+- replaceable source, AI, and delivery adapters;
+- versioned, testable contracts for normalization, AI output, scoring, and prompts;
+- simple operations before horizontal scale.
+
+## Architecture style
+
+The MVP is a modular monolith in a pnpm/TypeScript workspace. `api`, `collector`, `worker`, and `bot` are separate composition roots and future long-running processes, not independently designed microservices. A later `cli` provides offline fixture/eval commands but is not a service.
+
+Processes share application/domain packages and PostgreSQL. They do not call one another through private HTTP/RPC in the MVP. PostgreSQL is the durability and job-coordination boundary. See ADR-0002 for dependency and provider decisions.
+
+## Planned repository layout
+
+```text
+apps/
+  api/          # Fastify health, registry, profile, signal, feedback APIs
+  collector/    # permitted source fetching
+  worker/       # processing, AI, scoring, digest jobs
+  bot/          # Telegram delivery and feedback
+  cli/          # fixture processing and benchmark commands
+packages/
+  config/       # typed and conditional environment validation
+  core/         # domain model and pure deterministic policies
+  contracts/    # versioned Zod DTO and AI schemas
+  application/  # use cases and outbound ports
+  db/           # Prisma schema, migrations, repositories, Unit of Work
+  adapters/
+    sources/    # fixture, RSS, public HTTP
+    ai/         # fake and Ollama
+    delivery/   # fake and Telegram
+  jobs/         # PostgreSQL-backed job runtime
+  observability/# structured logger, metrics, correlation context
+  prompts/      # versioned prompts
+  evals/        # gold datasets and benchmark logic
+fixtures/
+  ingestion/
+  evals/
+infra/
+  docker/
+  systemd/
+  backup/
+docs/
+  adr/
+  architecture/
+  runbooks/
+.env.example
+```
+
+The folders are a target, not a reason to create empty placeholders. Add each app or package only when its first working vertical slice needs it.
+
+## Dependency direction
+
+```text
+apps/composition roots
+  -> config + observability + adapters + db + jobs
+  -> application
+application -> core + contracts
+contracts -> core + Zod
+db/adapters/jobs -> application ports + core/contracts
+prompts -> contracts
+evals -> application + contracts + AI port
+core -> Node.js standard library only
+```
+
+Packages never import from `apps`; apps never import from other apps. Domain code has no Fastify, Prisma, grammY, Ollama, environment, or concrete-logger dependency.
+
+## Canonical pipeline
+
+```text
+permitted sources
+  -> Source Registry rights check
+  -> SourceAdapter
+  -> RawItem (immutable)
+  -> NormalizedItem (versioned derivative)
+  -> exact/near dedup and source cluster
+  -> deterministic vertical/category/relevance rules
+  -> Signal (non-personalized)
+  -> AIProvider -> Analysis (zero or many versions)
+  -> UserProfile + ScoringEngine
+  -> Recommendation
+  -> Digest -> DeliveryPort
+  -> Feedback
+```
+
+The `ScoringEngine` can be implemented and tested before AI integration because it is a pure function. In the complete runtime flow, the personalized opportunity score is calculated from the profile and validated signal/analysis factors. A cheap pre-AI rule priority may decide whether analysis is worth running, but it is not presented as the final Opportunity Score.
+
+## Components
+
+### Source Registry and source adapters
+
+`SourceAdapter.fetch()` returns a batch of raw-item candidates and fetch metadata; it does not write the database. MVP adapters support fixtures, RSS, public JSON/HTTP APIs, and simple HTML with stable selectors. Browser automation and OCR are deferred.
+
+Every source records identity, URL/type, vertical hints, owner/contact when applicable, rights status, `ai_processing_allowed`, parser config, polling policy, reliability, and operational state.
+
+Collectors must:
+
+- preserve source URL, external ID, original URL, publication timestamp, raw text/payload, and fetch metadata;
+- be idempotent by `source_id + external_id`, falling back to a content hash when external identity is absent;
+- record last success/error, counts, and latency;
+- prevent overlapping fetches for the same source;
+- refuse AI enqueue when rights or `ai_processing_allowed` do not permit it;
+- use timeout, bounded retry, rate limits, and an identifying user-agent for live HTTP.
+
+Telegram ingestion is not a special central path. A future permitted/partner Telegram source must implement the same source port and rights checks. Mass unauthorized scraping is out of scope.
+
+### Raw preservation, normalization, and deduplication
+
+`RawItem` is immutable evidence. Reprocessing never deletes or rewrites the received body/payload.
+
+Normalization removes HTML/boilerplate, standardizes whitespace and dates, detects language metadata, and creates a canonical URL and normalized representation with a version. Empty/invalid input becomes an explicit rejection, not a silently missing record.
+
+Exact deduplication uses source external identity, canonical URL, and SHA-256 of normalized content. Bounded near-duplicate comparison is limited by vertical/category hints and a time window and records matching evidence. False-positive fixtures and before/after metrics protect recall.
+
+Several `RawItem`/`NormalizedItem` records may support one `Signal`; provenance from all supporting items remains queryable.
+
+### Deterministic classification and filtering
+
+Initial verticals are `CONSTRUCTION`, `HORECA`, and `OTHER`. Source metadata, dictionaries, region/category rules, and negative/ad patterns provide the baseline. Rules and taxonomy are versioned.
+
+Only unique, permitted, potentially relevant candidates reach AI work. Rule rejection and uncertainty are measurable; the system does not maximize filtering before recall is understood.
+
+### PostgreSQL jobs
+
+The MVP uses a `processing_jobs` table with job type, entity/idempotency key, status, attempts, `scheduled_at`, `locked_at`, lease owner, and last error. Workers use transactional claiming, bounded exponential backoff, stale-lock recovery, and terminal `FAILED` status. Redis is unnecessary until PostgreSQL is proven insufficient.
+
+`ART-013` first proves the same application use cases through a synchronous offline orchestrator. `ART-018` adds durable triggering and scheduling without duplicating domain logic.
+
+### AI provider and structured analysis
+
+Application logic depends on:
+
+```text
+AIProvider
+  analyzeSignal(request) -> validated SignalAnalysis or typed failure
+  healthCheck() -> provider health
+  modelInfo() -> provider/model capabilities and identity
+```
+
+`FakeAIProvider` is deterministic and is used in local development and CI. `OllamaAIProvider` is a later adapter. Ollama may run on the same host or a restricted private host; it is never publicly exposed.
+
+The versioned `SignalAnalysis` contract includes at least:
+
+```text
+headline
+summary
+whyImportant
+eventType
+facts[]
+inferences[]
+entities[]
+risks[]
+candidateActions[]
+deadline
+businessImpact
+urgency
+confidence
+actionability
+sourceIds[]
+model
+promptVersion
+schemaVersion
+analysisVersion
+createdAt
+```
+
+Rules:
+
+- facts and inferences remain separate;
+- unknown values are `null` or `unknown`, never invented;
+- every factual claim is attributable to source IDs;
+- input/output bounds, timeout, retry, and concurrency are explicit;
+- invalid output never becomes a successful `Analysis`;
+- repair, if introduced, is measured and versioned rather than silently hiding failures;
+- multiple analyses for a signal may coexist for reproducibility and benchmarks;
+- logs include versions, latency, token counts when available, and safe diagnostics without secrets/private PII.
+
+### Profiles, scoring, and recommendations
+
+Company Fit is deterministic where possible. The versioned score is:
+
+```text
+0.35 * BusinessImpact
++ 0.25 * CompanyFit
++ 0.20 * Urgency
++ 0.10 * Confidence
++ 0.10 * Actionability
+```
+
+Each factor and total are 0–100. Persist the factor breakdown, rule version, total, band, explanation, analysis version, and candidate actions. Weight/threshold changes require evidence and a new version; the model cannot change them.
+
+`Signal` is global. `Recommendation` references one signal/analysis and one profile and owns `companyFit` and the final Opportunity Score, allowing two companies to receive different explainable rankings for the same signal.
+
+### API
+
+Fastify exposes health first, then signals, sources, profiles, and feedback. All input/output contracts are versioned/validated. Public exposure is not assumed: localhost/internal access is the default until authentication, authorization, and rate limiting are explicitly configured.
+
+### Telegram delivery
+
+Use grammY and long polling for the closed MVP behind `DeliveryPort`. Commands/screens cover onboarding, interests/regions/profile, frequency, current digest, saved opportunities, provenance, help, and feedback.
+
+Cards show score, why it matters, practical actions, and source links. Store delivery/idempotency state and callback outcomes. A fake delivery adapter supports local/CI tests without a token.
+
+The bot is a delivery interface, not a reader for arbitrary third-party channels. Tokens remain only in secrets/env and never in Git or logs.
+
+### Feedback and outcomes
+
+Persist `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, and `ALREADY_KNOWN` with user, recommendation/delivery, timestamp, optional reason, and correlation context. Feedback informs measured rule/prompt changes but never silently changes scoring weights or model behavior.
+
+### Admin after closed MVP
+
+React + Vite remains deferred until after the closed MVP unless database queries/internal endpoints cannot support safe operations. It is not part of the Denis-computer readiness path.
+
+## Core data model
+
+- `sources`: identity, routing, rights/AI permission, parser/schedule, reliability, operational status.
+- `raw_items`: immutable source/external identity, URL, publication/receipt time, raw text/payload, content hash, correlation ID.
+- `normalized_items`: raw reference, normalizer version, title/text/language/date/entities, canonical URL, normalized hash, rejection state.
+- `signals`: non-personalized classification/relevance/category/status, rule versions, timestamps.
+- `signal_sources`: links a signal to all supporting raw/normalized items and dedup evidence.
+- `analyses`: versioned structured AI output, facts/inferences/entities/actions, model/prompt/schema versions, status/error.
+- `company_profiles`: company and interest dimensions used for fit.
+- `recommendations`: signal/analysis/profile tuple, factor breakdown, total/band, explanation, actions, versions.
+- `users`: Telegram identity and lifecycle status without unnecessary PII.
+- `subscriptions`: topics, regions, frequency, delivery state.
+- `deliveries`: digest/recommendation transport attempt, idempotency/provider reference, status/error.
+- `feedback`: action/reason/outcome with user, recommendation/delivery, timestamps.
+- `processing_jobs`: durable work, lease, retries, scheduling, and failure history.
+
+Use foreign keys, unique constraints, and migrations to enforce invariants. JSON is appropriate for raw payloads and versioned structured value collections, but identifiers, permissions, statuses, timestamps, versions, and query-critical dimensions remain typed columns.
+
+## Reliability and security
+
+- separate least-privilege database role per environment and restricted runtime credentials;
+- PostgreSQL and Ollama stay on localhost or a private restricted network;
+- typed config fails fast for the selected process/provider and does not demand unrelated credentials;
+- authentication and rate limiting precede any public API/admin endpoint;
+- daily backup and verified restore are required by hardening, not just a backup file;
+- health covers running processes and selected dependencies without exposing secrets/debug data;
+- monitoring covers disk, GPU when present, queue depth/wait, source errors, AI failures, and delivery failures;
+- logs redact bot tokens, passwords, authorization headers, full private PII, and private source credentials;
+- `.env`, Telegram sessions, keys, local model artifacts, and runtime data remain outside Git.
+
+## Observability chain
+
+Propagate a correlation ID through:
+
+```text
+source
+  -> raw_item
+  -> normalized_item
+  -> signal
+  -> analysis
+  -> recommendation
+  -> delivery
+  -> feedback
+```
+
+Stable event names and structured context must answer: what failed, for which source/item/user, at which stage, after how many attempts, with which contract/rule/model versions, and whether the failure is retryable or terminal.

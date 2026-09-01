@@ -1,0 +1,4 @@
+interface:
+  display_name: "Construction Radar Engineering"
+  short_description: "Build and review the TypeScript MVP safely"
+  default_prompt: "Use $construction-radar-engineering to implement the next MVP engineering task."

@@ -1,0 +1,33 @@
+{
+  "name": "construction-opportunity-radar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A source-backed, explainable opportunity radar for Construction and HoReCa.",
+  "engines": {
+    "node": ">=24.19.0 <25",
+    "pnpm": "11.19.0"
+  },
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --import tsx --watch apps/api/src/main.ts",
+    "start": "node --env-file-if-exists=.env apps/api/dist/main.js",
+    "lint": "eslint \"apps/**/*.ts\" \"packages/**/*.ts\" \"vitest.config.ts\" --max-warnings 0",
+    "format": "prettier --write \"apps/**/*.ts\" \"packages/**/*.ts\" \"*.{json,mjs,yaml,yml}\"",
+    "format:check": "prettier --check \"apps/**/*.ts\" \"packages/**/*.ts\" \"*.{json,mjs,yaml,yml}\"",
+    "typecheck": "tsc --project tsconfig.typecheck.json --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc --build --pretty false"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "eslint": "10.9.1",
+    "prettier": "3.9.6",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.11"
+  }
+}
