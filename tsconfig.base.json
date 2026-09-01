@@ -23,6 +23,7 @@
       "@radar/config": ["packages/config/src/index.ts"],
       "@radar/contracts": ["packages/contracts/src/index.ts"],
       "@radar/core": ["packages/core/src/index.ts"],
+      "@radar/db": ["packages/db/src/index.ts"],
       "@radar/observability": ["packages/observability/src/index.ts"]
     }
   }

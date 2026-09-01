@@ -1,0 +1,346 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SourceType {
+  FIXTURE
+  RSS
+  PUBLIC_API
+  WEB
+  PARTNER_FEED
+  PARTNER_TELEGRAM
+  MANUAL
+}
+
+enum RightsStatus {
+  OPEN_DATA
+  PUBLIC_API
+  PARTNER
+  CONSENT
+  REVIEW_REQUIRED
+  BLOCKED
+}
+
+enum ParserKind {
+  FIXTURE_JSON
+  RSS
+  JSON_API
+  HTML
+  MANUAL
+}
+
+enum Vertical {
+  CONSTRUCTION
+  HORECA
+  OTHER
+}
+
+enum SignalStatus {
+  CANDIDATE
+  ACTIVE
+  DISMISSED
+  SUPERSEDED
+}
+
+enum AnalysisStatus {
+  SUCCEEDED
+  FAILED
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+}
+
+enum CompanySize {
+  SELF_EMPLOYED
+  MICRO
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum ProfileVertical {
+  CONSTRUCTION
+  HORECA
+}
+
+enum OpportunityBand {
+  IGNORE
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FeedbackAction {
+  USEFUL
+  NOT_USEFUL
+  SAVED
+  ACTED
+  ALREADY_KNOWN
+}
+
+model Source {
+  id                    String                 @id @db.Uuid
+  name                  String                 @db.VarChar(300)
+  url                   String                 @db.Text
+  type                  SourceType
+  country               String                 @db.VarChar(100)
+  regions               String[]
+  verticals             Vertical[]
+  rightsStatus          RightsStatus           @map("rights_status")
+  rightsBasis           String?                @map("rights_basis") @db.Text
+  ownerContact          String?                @map("owner_contact") @db.VarChar(500)
+  aiProcessingAllowed   Boolean                @map("ai_processing_allowed")
+  parserKind            ParserKind             @map("parser_kind")
+  pollIntervalMinutes   Int?                   @map("poll_interval_minutes")
+  reliabilityScore      Float                  @map("reliability_score")
+  signalQualityNotes    String?                @map("signal_quality_notes") @db.Text
+  enabled               Boolean
+  lastSuccessAt         DateTime?              @map("last_success_at") @db.Timestamptz(3)
+  lastErrorAt           DateTime?              @map("last_error_at") @db.Timestamptz(3)
+  createdAt             DateTime               @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime               @map("updated_at") @db.Timestamptz(3)
+  rawItems              RawItem[]
+  signalEvidence        SignalEvidence[]
+  analysisSources       AnalysisSource[]
+  recommendationSources RecommendationSource[]
+
+  @@index([enabled, rightsStatus, aiProcessingAllowed], map: "sources_permission_idx")
+  @@map("sources")
+}
+
+model RawItem {
+  id              String           @id @db.Uuid
+  sourceId        String           @map("source_id") @db.Uuid
+  externalId      String?          @map("external_id") @db.VarChar(500)
+  originalUrl     String           @map("original_url") @db.Text
+  publishedAt     DateTime?        @map("published_at") @db.Timestamptz(3)
+  receivedAt      DateTime         @map("received_at") @db.Timestamptz(3)
+  rawText         String           @map("raw_text") @db.Text
+  rawPayload      Json?            @map("raw_payload") @db.JsonB
+  contentHash     String           @map("content_hash") @db.Char(64)
+  correlationId   String           @map("correlation_id") @db.Uuid
+  source          Source           @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  normalizedItems NormalizedItem[]
+
+  @@unique([sourceId, externalId], map: "raw_items_source_external_key")
+  @@unique([sourceId, contentHash], map: "raw_items_source_hash_key")
+  @@index([sourceId, publishedAt], map: "raw_items_source_published_idx")
+  @@index([receivedAt], map: "raw_items_received_idx")
+  @@map("raw_items")
+}
+
+model NormalizedItem {
+  id                String           @id @db.Uuid
+  rawItemId         String           @map("raw_item_id") @db.Uuid
+  normalizerVersion String           @map("normalizer_version") @db.VarChar(100)
+  title             String?          @db.VarChar(1000)
+  text              String           @db.Text
+  language          String           @db.VarChar(35)
+  publishedAt       DateTime?        @map("published_at") @db.Timestamptz(3)
+  canonicalUrl      String           @map("canonical_url") @db.Text
+  entities          Json             @default("[]") @db.JsonB
+  normalizedHash    String           @map("normalized_hash") @db.Char(64)
+  correlationId     String           @map("correlation_id") @db.Uuid
+  createdAt         DateTime         @map("created_at") @db.Timestamptz(3)
+  rawItem           RawItem          @relation(fields: [rawItemId], references: [id], onDelete: Restrict)
+  signalEvidence    SignalEvidence[]
+
+  @@unique([rawItemId, normalizerVersion], map: "normalized_items_raw_version_key")
+  @@index([normalizedHash], map: "normalized_items_hash_idx")
+  @@index([canonicalUrl], map: "normalized_items_canonical_url_idx")
+  @@index([publishedAt], map: "normalized_items_published_idx")
+  @@map("normalized_items")
+}
+
+model Signal {
+  id                       String           @id @db.Uuid
+  vertical                 Vertical
+  category                 String           @db.VarChar(200)
+  relevanceScore           Float            @map("relevance_score")
+  classificationConfidence Float            @map("classification_confidence")
+  classifierVersion        String           @map("classifier_version") @db.VarChar(100)
+  taxonomyVersion          String           @map("taxonomy_version") @db.VarChar(100)
+  status                   SignalStatus
+  supersededBySignalId     String?          @map("superseded_by_signal_id") @db.Uuid
+  correlationId            String           @map("correlation_id") @db.Uuid
+  createdAt                DateTime         @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime         @map("updated_at") @db.Timestamptz(3)
+  supersededBy             Signal?          @relation("SignalSupersession", fields: [supersededBySignalId], references: [id], onDelete: Restrict)
+  supersedes               Signal[]         @relation("SignalSupersession")
+  evidence                 SignalEvidence[]
+  analyses                 Analysis[]
+  recommendations          Recommendation[]
+
+  @@index([vertical, category, status, createdAt], map: "signals_discovery_idx")
+  @@map("signals")
+}
+
+model SignalEvidence {
+  signalId         String         @map("signal_id") @db.Uuid
+  normalizedItemId String         @map("normalized_item_id") @db.Uuid
+  sourceId         String         @map("source_id") @db.Uuid
+  signal           Signal         @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  normalizedItem   NormalizedItem @relation(fields: [normalizedItemId], references: [id], onDelete: Restrict)
+  source           Source         @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@id([signalId, normalizedItemId, sourceId])
+  @@index([normalizedItemId], map: "signal_evidence_normalized_idx")
+  @@index([sourceId], map: "signal_evidence_source_idx")
+  @@map("signal_evidence")
+}
+
+model Analysis {
+  id               String           @id @db.Uuid
+  signalId         String           @map("signal_id") @db.Uuid
+  provider         String           @db.VarChar(100)
+  model            String           @db.VarChar(200)
+  promptVersion    String           @map("prompt_version") @db.VarChar(100)
+  schemaVersion    String           @map("schema_version") @db.VarChar(100)
+  analysisVersion  String           @map("analysis_version") @db.VarChar(100)
+  status           AnalysisStatus
+  headline         String?          @db.VarChar(500)
+  summary          String?          @db.Text
+  whyImportant     String?          @map("why_important") @db.Text
+  eventType        String?          @map("event_type") @db.VarChar(200)
+  facts            Json?            @db.JsonB
+  inferences       Json?            @db.JsonB
+  entities         Json?            @db.JsonB
+  risks            Json?            @db.JsonB
+  candidateActions Json?            @map("candidate_actions") @db.JsonB
+  deadline         DateTime?        @db.Timestamptz(3)
+  businessImpact   Float?           @map("business_impact")
+  urgency          Float?
+  confidence       Float?
+  actionability    Float?
+  failureCode      String?          @map("failure_code") @db.VarChar(100)
+  failureReason    String?          @map("failure_reason") @db.Text
+  retryable        Boolean?
+  correlationId    String           @map("correlation_id") @db.Uuid
+  createdAt        DateTime         @map("created_at") @db.Timestamptz(3)
+  signal           Signal           @relation(fields: [signalId], references: [id], onDelete: Restrict)
+  sources          AnalysisSource[]
+  recommendations  Recommendation[]
+
+  @@unique([signalId, provider, model, promptVersion, schemaVersion, analysisVersion], map: "analyses_identity_key")
+  @@unique([id, signalId], map: "analyses_id_signal_key")
+  @@index([signalId, status, createdAt], map: "analyses_signal_status_idx")
+  @@map("analyses")
+}
+
+model AnalysisSource {
+  analysisId String   @map("analysis_id") @db.Uuid
+  sourceId   String   @map("source_id") @db.Uuid
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  source     Source   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@id([analysisId, sourceId])
+  @@index([sourceId], map: "analysis_sources_source_idx")
+  @@map("analysis_sources")
+}
+
+model User {
+  id             String                   @id @db.Uuid
+  telegramUserId String                   @unique(map: "users_telegram_user_key") @map("telegram_user_id") @db.VarChar(100)
+  status         UserStatus
+  revision       Int
+  createdAt      DateTime                 @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                 @map("updated_at") @db.Timestamptz(3)
+  profiles       CompanyProfileRevision[]
+  feedback       Feedback[]
+
+  @@map("users")
+}
+
+model CompanyProfileRevision {
+  id                   String            @db.Uuid
+  revision             Int
+  userId               String            @map("user_id") @db.Uuid
+  companyType          String            @map("company_type") @db.VarChar(300)
+  companySize          CompanySize       @map("company_size")
+  verticals            ProfileVertical[]
+  regions              String[]
+  servicesAndProducts  String[]          @map("services_and_products")
+  targetClients        String[]          @map("target_clients")
+  interestedEventTypes String[]          @map("interested_event_types")
+  ignoredEventTypes    String[]          @map("ignored_event_types")
+  keywords             String[]
+  excludedKeywords     String[]          @map("excluded_keywords")
+  projectValueMinimum  Float?            @map("project_value_minimum")
+  projectValueMaximum  Float?            @map("project_value_maximum")
+  projectValueCurrency String?           @map("project_value_currency") @db.Char(3)
+  createdAt            DateTime          @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime          @map("updated_at") @db.Timestamptz(3)
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  recommendations      Recommendation[]
+
+  @@id([id, revision])
+  @@index([userId, revision], map: "company_profile_user_revision_idx")
+  @@map("company_profile_revisions")
+}
+
+model Recommendation {
+  id                  String                 @id @db.Uuid
+  signalId            String                 @map("signal_id") @db.Uuid
+  analysisId          String                 @map("analysis_id") @db.Uuid
+  userProfileId       String                 @map("user_profile_id") @db.Uuid
+  userProfileRevision Int                    @map("user_profile_revision")
+  businessImpact      Float                  @map("business_impact")
+  companyFit          Float                  @map("company_fit")
+  urgency             Float
+  confidence          Float
+  actionability       Float
+  totalScore          Float                  @map("total_score")
+  band                OpportunityBand
+  explanation         String                 @db.Text
+  recommendedActions  Json                   @map("recommended_actions") @db.JsonB
+  scoringVersion      String                 @map("scoring_version") @db.VarChar(100)
+  correlationId       String                 @map("correlation_id") @db.Uuid
+  createdAt           DateTime               @map("created_at") @db.Timestamptz(3)
+  signal              Signal                 @relation(fields: [signalId], references: [id], onDelete: Restrict)
+  analysis            Analysis               @relation(fields: [analysisId, signalId], references: [id, signalId], onDelete: Restrict)
+  userProfile         CompanyProfileRevision @relation(fields: [userProfileId, userProfileRevision], references: [id, revision], onDelete: Restrict)
+  sources             RecommendationSource[]
+  feedback            Feedback[]
+
+  @@unique([signalId, analysisId, userProfileId, userProfileRevision, scoringVersion], map: "recommendations_identity_key")
+  @@index([userProfileId, userProfileRevision, band, totalScore], map: "recommendations_profile_score_idx")
+  @@map("recommendations")
+}
+
+model RecommendationSource {
+  recommendationId String         @map("recommendation_id") @db.Uuid
+  sourceId         String         @map("source_id") @db.Uuid
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  source           Source         @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@id([recommendationId, sourceId])
+  @@index([sourceId], map: "recommendation_sources_source_idx")
+  @@map("recommendation_sources")
+}
+
+model Feedback {
+  id               String         @id @db.Uuid
+  userId           String         @map("user_id") @db.Uuid
+  recommendationId String         @map("recommendation_id") @db.Uuid
+  deliveryId       String?        @map("delivery_id") @db.Uuid
+  action           FeedbackAction
+  reason           String?        @db.Text
+  correlationId    String         @map("correlation_id") @db.Uuid
+  createdAt        DateTime       @map("created_at") @db.Timestamptz(3)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, recommendationId, action], map: "feedback_identity_key")
+  @@index([createdAt], map: "feedback_created_idx")
+  @@map("feedback")
+}

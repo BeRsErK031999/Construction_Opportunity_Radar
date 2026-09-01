@@ -27,8 +27,9 @@ Examples of actions:
 - `ART-001` pre-development audit is complete: the RoadMap, modular-monolith boundary, provider abstraction, canonical data chain, planned commands, and external blockers are documented.
 - `ART-002 Project scaffold` is complete: Node.js 24/pnpm workspace, Fastify health API, typed config, redacted structured logging, graceful shutdown, lockfile, strict checks, and smoke tests work without external services.
 - `ART-003 Domain model` is complete: `packages/core` contains immutable source-to-feedback models, branded identifiers, permission/provenance/version/time invariants, safe identity keys, and a documented PostgreSQL mapping.
-- `ART-004 PostgreSQL persistence` is the next task.
-- No migrations, PostgreSQL integration, repositories, source adapter, AI/delivery adapter, or CI exists yet.
+- `ART-004 PostgreSQL persistence` is in progress: the pinned Prisma 7/PostgreSQL schema, initial migration with database constraints, localhost-only Docker Compose, Source/RawItem repositories, deterministic seed, and Testcontainers integration suite are implemented.
+- Local integration evidence is pending because Docker Desktop on the current workstation cannot start its container runtime; schema validation, generation, unit tests, typecheck, and build remain available without it.
+- No source adapter, AI/delivery adapter, or CI exists yet.
 - ART-002 evidence: frozen install, format check, lint, strict typecheck, 9 tests, build, dependency audit, built-server health request, and SIGINT shutdown all succeeded.
 - ART-003 evidence: format, lint, strict typecheck, 30 tests, and build succeeded; 21 domain tests cover permissions, immutable raw evidence, version/provenance, facts versus inferences, profile boundaries, recommendation scoring ranges, and attributable feedback.
 - The ART-001–ART-003 foundation is committed and pushed to `origin/main`; no deploy, live source call, Telegram call, or Ollama call has been performed.

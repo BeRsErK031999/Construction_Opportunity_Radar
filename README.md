@@ -23,8 +23,9 @@
 4. [docs/architecture/MVP_ARCHITECTURE.md](docs/architecture/MVP_ARCHITECTURE.md) — целевой pipeline, модули и данные.
 5. [docs/architecture/PRE_DEVELOPMENT_AUDIT.md](docs/architecture/PRE_DEVELOPMENT_AUDIT.md) — результат ART-001, planned tree, зависимости, порты, env и тестовая стратегия.
 6. [docs/architecture/DOMAIN_MODEL.md](docs/architecture/DOMAIN_MODEL.md) — словарь ART-003, инварианты и mapping к PostgreSQL.
-7. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-8. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+7. [docs/runbooks/LOCAL_POSTGRESQL.md](docs/runbooks/LOCAL_POSTGRESQL.md) — запуск PostgreSQL, migrations, seed и integration tests.
+8. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+9. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -55,6 +56,19 @@ pnpm build
 pnpm start
 ```
 
+## Локальная база данных
+
+PostgreSQL публикуется только на `127.0.0.1:54329`. Первый запуск persistence-контура:
+
+```powershell
+pnpm db:up
+pnpm db:migrate:deploy
+pnpm db:seed
+pnpm test:integration
+```
+
+`db:seed` повторяем: на чистой базе создаёт 10 sources, 100 raw items и 0 signals, повторный запуск не добавляет дубли. Подробности и clean-reset — в [локальном runbook](docs/runbooks/LOCAL_POSTGRESQL.md).
+
 ## Проверки
 
 ```powershell
@@ -62,7 +76,9 @@ pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:integration
 pnpm build
+pnpm db:validate
 ```
 
 ## Ближайший технический результат

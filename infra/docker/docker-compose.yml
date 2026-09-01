@@ -1,0 +1,22 @@
+name: construction-opportunity-radar
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-radar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-radar_local}
+      POSTGRES_USER: ${POSTGRES_USER:-radar}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-54329}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    volumes:
+      - radar-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  radar-postgres-data:

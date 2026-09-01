@@ -6,6 +6,9 @@ packages:
 allowBuilds:
   esbuild: true
 
+overrides:
+  deepmerge-ts: 8.0.2
+
 engineStrict: true
 
 saveExact: true

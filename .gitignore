@@ -8,6 +8,7 @@ coverage/
 .pnpm-store/
 .eslintcache
 *.tsbuildinfo
+packages/db/src/generated/
 
 # Local configuration and secrets
 .env
@@ -31,6 +32,7 @@ backups/
 *.sqlite3
 models/
 .ollama/
+.testcontainers.properties
 
 # Editors and OS
 .idea/

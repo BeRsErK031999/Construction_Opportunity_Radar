@@ -7,17 +7,16 @@ const fromRoot = (path: string): string => fileURLToPath(new URL(path, import.me
 export default defineConfig({
   resolve: {
     alias: {
-      "@radar/config": fromRoot("./packages/config/src/index.ts"),
-      "@radar/contracts": fromRoot("./packages/contracts/src/index.ts"),
       "@radar/core": fromRoot("./packages/core/src/index.ts"),
       "@radar/db": fromRoot("./packages/db/src/index.ts"),
-      "@radar/observability": fromRoot("./packages/observability/src/index.ts"),
     },
   },
   test: {
     clearMocks: true,
     environment: "node",
-    include: ["apps/**/test/**/*.test.ts", "packages/**/test/**/*.test.ts"],
+    fileParallelism: false,
+    include: ["packages/**/integration/**/*.test.ts"],
     restoreMocks: true,
+    testTimeout: 30_000,
   },
 });
