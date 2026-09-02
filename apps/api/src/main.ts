@@ -2,6 +2,13 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { loadApiConfig } from "@radar/config";
+import {
+  createDatabaseClient,
+  PrismaFeedbackRepository,
+  PrismaProfileRegistrationRepository,
+  PrismaSignalOpportunityRepository,
+  PrismaSourceRepository,
+} from "@radar/db";
 import { createLogger } from "@radar/observability";
 
 import { startApi } from "./lifecycle.js";
@@ -20,7 +27,18 @@ export const runApi = async (): Promise<void> => {
     service: "api",
   });
 
-  await startApi({ config, logger });
+  const client = createDatabaseClient(config.databaseUrl);
+  await startApi({
+    config,
+    logger,
+    onClose: () => client.$disconnect(),
+    repositories: {
+      feedback: new PrismaFeedbackRepository(client),
+      profiles: new PrismaProfileRegistrationRepository(client),
+      signals: new PrismaSignalOpportunityRepository(client),
+      sources: new PrismaSourceRepository(client),
+    },
+  });
 };
 
 if (isMainModule(import.meta.url)) {

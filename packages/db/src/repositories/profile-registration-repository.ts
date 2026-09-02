@@ -1,6 +1,8 @@
 import {
   type ProfileRegistrationRepository,
   type ProfileRegistrationSaveResult,
+  type UserProfileRepository as UserProfileApiRepository,
+  type UserProfileRegistration,
 } from "@radar/application";
 import { type User, type UserProfile } from "@radar/core";
 
@@ -17,7 +19,9 @@ import {
 const same = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
-export class PrismaProfileRegistrationRepository implements ProfileRegistrationRepository {
+export class PrismaProfileRegistrationRepository
+  implements ProfileRegistrationRepository, UserProfileApiRepository
+{
   readonly #client: DatabaseClient;
 
   constructor(client: DatabaseClient) {
@@ -26,6 +30,23 @@ export class PrismaProfileRegistrationRepository implements ProfileRegistrationR
 
   countProfiles(): Promise<number> {
     return this.#client.companyProfileRevision.count();
+  }
+
+  async findLatest(userId: User["id"]): Promise<UserProfileRegistration | null> {
+    const userRecord = await this.#client.user.findUnique({ where: { id: userId } });
+    if (userRecord === null) {
+      return null;
+    }
+    const profileRecord = await this.#client.companyProfileRevision.findFirst({
+      orderBy: [{ revision: "desc" }, { id: "asc" }],
+      where: { userId },
+    });
+    return profileRecord === null
+      ? null
+      : Object.freeze({
+          profile: userProfileFromRecord(profileRecord),
+          user: userFromRecord(userRecord),
+        });
   }
 
   async save(user: User, profile: UserProfile): Promise<ProfileRegistrationSaveResult> {

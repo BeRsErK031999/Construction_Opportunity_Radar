@@ -46,12 +46,15 @@ Examples of actions:
 - `ART-013 Full offline pipeline` is complete: the application-owned synchronous orchestrator composes persistence, rules, validated fake analysis, profile scoring, and PostgreSQL Analysis/Recommendation repositories behind `pnpm process:fixtures`.
 - A clean isolated PostgreSQL run produces 200 raw items, 200 normalized items, 150 deduplication clusters, 110 permitted signals, 110 successful analyses, and 110 recommendations for two fixture profiles. A second run with a different execution timestamp creates zero rows and makes zero provider calls.
 - Analysis failures are stored with safe stable codes; provider/request identity drift becomes `AI_INVALID_RESPONSE`. Existing analysis identity is checked before inference, and scoring remains versioned and deterministic.
+- `ART-014 Application API` is complete: the private Fastify contract exposes public liveness plus authenticated Source Registry, personalized SignalOpportunity, append-only UserProfile, and idempotent Feedback operations backed by PostgreSQL repositories.
+- API v1 rejects unknown fields, bounds cursor pagination, keeps Signal global while filtering profile-owned Recommendation score, enforces source AI-rights invariants and profile ownership, and returns one safe versioned error envelope. Production config requires an explicit database URL, a 32+ character Bearer token, and loopback binding until security hardening.
+- The HTTP contract is documented field by field under `docs/presentation/http`; 12 new contract/HTTP tests and the PostgreSQL integration suite cover authorization, permission rejection, profile revision, evidence-backed reads, feedback persistence, idempotency, and sentiment conflict.
 - Milestone M2 is achieved. Gate G2 is not passed because collector uptime, AI JSON success under a real model, durable-job restart, and operational duplicate metrics are not yet evidenced.
-- `ART-014 Application API` is next.
+- `ART-015 Telegram UI` is next.
 - No approved live source or live AI endpoint has been called; no Ollama/delivery adapter or CI exists yet.
 - ART-002 evidence: frozen install, format check, lint, strict typecheck, 9 tests, build, dependency audit, built-server health request, and SIGINT shutdown all succeeded.
-- Current evidence: frozen install, format, lint, strict typecheck, 117 unit/contract tests, build, Prisma generation/validation, 10 PostgreSQL integration tests, dependency audit, and two full local CLI runs succeed. The Docker-backed fixture run proves the idempotent 200 -> 200 -> 150 -> 110 -> 110 -> 110 chain.
-- The ART-001–ART-012 implementation is committed and pushed to `origin/main` through commit `c4e2ae8`; ART-013 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
+- Current evidence: frozen install, format, lint, strict typecheck, 129 unit/contract/HTTP tests, build, Prisma generation/validation, 10 PostgreSQL integration tests, dependency audit, and two full local CLI runs succeed. The Docker-backed fixture run proves the idempotent 200 -> 200 -> 150 -> 110 -> 110 -> 110 chain and the API persistence path.
+- The ART-001–ART-013 implementation is committed and pushed to `origin/main` through commit `8c771f9`; ART-014 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
 
 ## People
 

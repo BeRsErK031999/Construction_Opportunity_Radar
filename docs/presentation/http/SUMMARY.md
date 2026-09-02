@@ -1,0 +1,22 @@
+# HTTP API
+
+- [Обзор](README.md)
+- [Private API v1](private/v1/README.md)
+  - Common
+    - [Аутентификация и авторизация](private/v1/common/authentication.md)
+    - [Ошибки](private/v1/common/errors.md)
+    - [Пагинация](private/v1/common/pagination.md)
+    - [Модели](private/v1/common/models.md)
+  - Health
+    - [GET /health](private/v1/health/get.md)
+  - Sources
+    - [GET /sources](private/v1/sources/list.md)
+    - [POST /sources](private/v1/sources/create.md)
+    - [PATCH /sources/:id](private/v1/sources/patch.md)
+  - Signals
+    - [GET /signals](private/v1/signals/list.md)
+    - [GET /signals/:id](private/v1/signals/get.md)
+    - [POST /signals/:id/feedback](private/v1/signals/feedback.md)
+  - Users
+    - [GET /users/:id/profile](private/v1/users/get-profile.md)
+    - [PATCH /users/:id/profile](private/v1/users/patch-profile.md)

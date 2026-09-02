@@ -1,7 +1,7 @@
 import type { ApiConfig } from "@radar/config";
 import { createLogger, type AppLogger } from "@radar/observability";
 
-import { buildApi } from "./app.js";
+import { buildApi, type ApiRepositories } from "./app.js";
 
 const SHUTDOWN_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
@@ -12,6 +12,8 @@ export interface StartApiOptions {
   readonly config: ApiConfig;
   readonly installSignalHandlers?: boolean;
   readonly logger?: AppLogger;
+  readonly onClose?: () => Promise<void>;
+  readonly repositories?: ApiRepositories | null;
 }
 
 export interface RunningApi {
@@ -55,7 +57,12 @@ export const startApi = async (options: StartApiOptions): Promise<RunningApi> =>
       level: config.logLevel,
       service: "api",
     });
-  const app = buildApi({ logger });
+  const app = buildApi({
+    apiAuthToken: config.apiAuthToken,
+    logger,
+    ...(options.onClose === undefined ? {} : { onClose: options.onClose }),
+    ...(options.repositories === undefined ? {} : { repositories: options.repositories }),
+  });
   const signalHandlers = new Map<ShutdownSignal, () => void>();
   let closePromise: Promise<void> | undefined;
 

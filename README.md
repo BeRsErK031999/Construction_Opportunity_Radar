@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-013` реализуют полный независимый от реальной модели офлайн-контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score и сохранённые Recommendation. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-014 Application API`.
+`ART-004`–`ART-014` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, сохранённые Recommendation и private Fastify API v1. API предоставляет permission-safe Source Registry, персональные SignalOpportunity, append-only профиль и идемпотентный feedback. Следующий critical-path пункт — `ART-015 Telegram UI`.
 
 Первый продуктовый контур:
 
@@ -29,8 +29,9 @@
 10. [docs/runbooks/OPPORTUNITY_SCORING.md](docs/runbooks/OPPORTUNITY_SCORING.md) — формула, company-fit rules, bands и guardrails scoring-v1.
 11. [docs/runbooks/FAKE_AI_PROVIDER.md](docs/runbooks/FAKE_AI_PROVIDER.md) — provider-neutral AI contract, permission boundary, fake-режимы и failure taxonomy.
 12. [docs/runbooks/STRUCTURED_AI_CONTRACT.md](docs/runbooks/STRUCTURED_AI_CONTRACT.md) — `ai-analysis/v1`, relational validation, identity/provenance checks и invalid-response outcome.
-13. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-14. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+13. [docs/presentation/http/README.md](docs/presentation/http/README.md) — private HTTP API v1, endpoints, поля, auth, ошибки и pagination.
+14. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+15. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -52,7 +53,7 @@ pnpm dev
 Invoke-RestMethod http://127.0.0.1:3000/health
 ```
 
-Локальный `.env` необязателен. Доступные ключи перечислены без значений в `.env.example`; пустые значения используют безопасные defaults. PostgreSQL, Telegram и Ollama для текущих API/core-проверок не нужны.
+Локальный `.env` необязателен для `/health`. Business endpoints требуют запущенную мигрированную PostgreSQL и `API_AUTH_TOKEN` длиной не менее 32 символов; доступные ключи перечислены без значений в `.env.example`. Telegram и Ollama для текущего API не нужны. Production-конфигурация дополнительно требует явный `DATABASE_URL` и разрешает только loopback bind до ART-022.
 
 Production-like запуск собранного JavaScript:
 
@@ -100,7 +101,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-014`: application API для health, signals, sources, user profile и feedback с Zod validation, фильтрами, authorization boundary и safe errors.
+Реализовать `ART-015`: Telegram transport/UI с меню возможностей, дайджеста, сохранённых, интересов и помощи; карточка должна показывать score, объяснение, конкретные действия и source link, а adapter — тестироваться без реального bot token.
 
 ## Источники планирования
 

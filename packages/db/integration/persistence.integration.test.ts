@@ -8,7 +8,10 @@ import {
   executeDeduplication,
   executeNormalization,
   ingestSource,
+  listSignalOpportunities,
+  patchUserProfile,
   processOfflinePipeline,
+  submitSignalFeedback,
   type Classifier,
   type Deduplicator,
   type RawItemNormalizer,
@@ -25,6 +28,7 @@ import {
   createUserProfile,
   DEDUPLICATOR_VERSION_V1,
   deduplicateCandidatesV1,
+  feedbackId,
   isAiProcessingPermitted,
   NORMALIZER_VERSION_V1,
   normalizeRawItemV1,
@@ -48,11 +52,13 @@ import {
   PrismaAnalysisRepository,
   PrismaClassificationRepository,
   PrismaDeduplicationRepository,
+  PrismaFeedbackRepository,
   PrismaRawItemRepository,
   PrismaNormalizationOutcomeRepository,
   PrismaProfileRegistrationRepository,
   PrismaSourceRepository,
   PrismaRecommendationRepository,
+  PrismaSignalOpportunityRepository,
   RawItemIdentityConflictError,
   seedDevelopmentDatabase,
   type DatabaseClient,
@@ -685,5 +691,88 @@ describe("PostgreSQL persistence", () => {
         where: { sources: { some: { source: { aiProcessingAllowed: false } } } },
       }),
     ).toBe(0);
+
+    const constructionRegistration = input.profiles[0];
+    if (constructionRegistration === undefined) {
+      throw new Error("Construction profile fixture is required");
+    }
+    const opportunityRepository = new PrismaSignalOpportunityRepository(client);
+    const opportunities = await listSignalOpportunities({
+      callerUserId: constructionRegistration.user.id,
+      filter: {
+        limit: 2,
+        minimumScore: 0,
+        status: "CANDIDATE",
+        vertical: "CONSTRUCTION",
+      },
+      repository: opportunityRepository,
+    });
+    const firstOpportunity = opportunities.items[0];
+    if (firstOpportunity === undefined) {
+      throw new Error("At least one persisted opportunity is required");
+    }
+    expect(opportunities.items).toHaveLength(2);
+    expect(opportunities.items.every((item) => item.analysis.facts.length > 0)).toBe(true);
+    expect(firstOpportunity.sources.length).toBeGreaterThan(0);
+    expect(
+      await opportunityRepository.findForUser(
+        constructionRegistration.user.id,
+        firstOpportunity.signal.id,
+      ),
+    ).toMatchObject({ signal: { id: firstOpportunity.signal.id } });
+
+    const updatedProfile = await patchUserProfile({
+      callerUserId: constructionRegistration.user.id,
+      now: "2026-09-10T02:00:00.000Z",
+      patch: { keywords: ["бетон", "генподряд"] },
+      repository: repositories.profiles,
+      userId: constructionRegistration.user.id,
+    });
+    expect(updatedProfile.revision).toBe(2);
+    expect(
+      (await repositories.profiles.findLatest(constructionRegistration.user.id))?.profile,
+    ).toMatchObject({
+      keywords: ["бетон", "генподряд"],
+      revision: 2,
+    });
+    expect(
+      (
+        await listSignalOpportunities({
+          callerUserId: constructionRegistration.user.id,
+          filter: { limit: 2 },
+          repository: opportunityRepository,
+        })
+      ).items,
+    ).toHaveLength(0);
+
+    const feedbackRepository = new PrismaFeedbackRepository(client);
+    const feedbackInput = {
+      action: "USEFUL" as const,
+      callerUserId: constructionRegistration.user.id,
+      feedbackId: feedbackId("73000000-0000-4000-8000-000000000001"),
+      repository: feedbackRepository,
+      signalId: firstOpportunity.signal.id,
+    };
+    const feedbackCreated = await submitSignalFeedback({
+      ...feedbackInput,
+      now: "2026-09-10T02:01:00.000Z",
+    });
+    const feedbackRepeated = await submitSignalFeedback({
+      ...feedbackInput,
+      now: "2026-09-10T02:02:00.000Z",
+    });
+    expect(feedbackCreated.created).toBe(true);
+    expect(feedbackRepeated.created).toBe(false);
+    expect(await client.feedback.count()).toBe(1);
+    await expect(
+      submitSignalFeedback({
+        action: "NOT_USEFUL",
+        callerUserId: constructionRegistration.user.id,
+        feedbackId: feedbackId("73000000-0000-4000-8000-000000000002"),
+        now: "2026-09-10T02:03:00.000Z",
+        repository: feedbackRepository,
+        signalId: firstOpportunity.signal.id,
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });

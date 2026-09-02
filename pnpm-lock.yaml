@@ -39,18 +39,30 @@ importers:
 
   apps/api:
     dependencies:
+      '@radar/application':
+        specifier: workspace:*
+        version: link:../../packages/application
       '@radar/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@radar/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@radar/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@radar/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@radar/observability':
         specifier: workspace:*
         version: link:../../packages/observability
       fastify:
         specifier: 5.12.1
         version: 5.12.1
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
 
   apps/cli:
     dependencies:

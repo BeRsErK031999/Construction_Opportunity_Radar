@@ -5,9 +5,13 @@
   "type": "module",
   "main": "./dist/main.js",
   "dependencies": {
+    "@radar/application": "workspace:*",
     "@radar/config": "workspace:*",
     "@radar/contracts": "workspace:*",
+    "@radar/core": "workspace:*",
+    "@radar/db": "workspace:*",
     "@radar/observability": "workspace:*",
-    "fastify": "5.12.1"
+    "fastify": "5.12.1",
+    "zod": "4.5.4"
   }
 }

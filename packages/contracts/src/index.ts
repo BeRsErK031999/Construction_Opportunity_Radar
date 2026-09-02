@@ -3,6 +3,7 @@ export {
   AIAnalysisResponseV1Schema,
   type AIAnalysisResponseV1,
 } from "./ai-analysis-v1.js";
+export * from "./api-v1.js";
 export {
   FixtureIngestionDatasetV1Schema,
   FixtureItemLabelsV1Schema,
