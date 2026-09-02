@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-003 Domain model` завершён: в чистом `packages/core` реализована цепочка от разрешённого `Source` до attributable `Feedback`, включая immutable raw evidence, versioned analysis, разделение facts/inferences и profile-specific recommendation. Следующая задача — `ART-004 PostgreSQL persistence`.
+`ART-004`–`ART-008` закрывают первую офлайн-цепочку данных: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization без изменения raw evidence и exact/near deduplication. Проверенный Docker-run даёт 200 raw, 200 normalized и 150 dedup-кластеров; повторный запуск каждой стадии создаёт 0 записей. Следующий critical-path пункт — `ART-006 RSS/HTTP adapter`.
 
 Первый продуктовый контур:
 
@@ -69,6 +69,16 @@ pnpm test:integration
 
 `db:seed` повторяем: на чистой базе создаёт 10 sources, 100 raw items и 0 signals, повторный запуск не добавляет дубли. Подробности и clean-reset — в [локальном runbook](docs/runbooks/LOCAL_POSTGRESQL.md).
 
+Версионированный корпус `fixture-ingestion/v1` содержит 200 материалов для Construction, HoReCa и негативного класса OTHER, включая рекламу, exact- и near-дубли. После migrations загрузка выполняется одной повторяемой командой:
+
+```powershell
+pnpm fixtures:ingest
+pnpm fixtures:normalize
+pnpm fixtures:deduplicate
+```
+
+На проверенном корпусе итог дедупликации стабилен: 200 assignments, 150 кластеров, 25 exact- и 25 near-дублей. Evidence каждого решения хранится отдельно с версией `deduplicator-v1`; AI при этом не вызывается.
+
 ## Проверки
 
 ```powershell
@@ -83,7 +93,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-В `ART-004` отобразить утверждённую domain model в PostgreSQL/Prisma: Docker Compose, migrations, repositories, integration tests и повторяемый development seed на 10 sources и 100 raw items.
+Реализовать `ART-006`: generic RSS/HTTP source adapter с ограниченными timeout/retry/rate-limit, полным provenance и offline fixture tests; live smoke выполнять только для явно одобренного источника.
 
 ## Источники планирования
 

@@ -53,6 +53,19 @@ enum AnalysisStatus {
   FAILED
 }
 
+enum NormalizationStatus {
+  SUCCEEDED
+  REJECTED
+}
+
+enum DeduplicationMatchKind {
+  REPRESENTATIVE
+  SOURCE_IDENTITY
+  CANONICAL_URL
+  NORMALIZED_HASH
+  NEAR_TEXT
+}
+
 enum UserStatus {
   ACTIVE
   BLOCKED
@@ -131,6 +144,7 @@ model RawItem {
   correlationId   String           @map("correlation_id") @db.Uuid
   source          Source           @relation(fields: [sourceId], references: [id], onDelete: Restrict)
   normalizedItems NormalizedItem[]
+  normalizationAttempts NormalizationAttempt[]
 
   @@unique([sourceId, externalId], map: "raw_items_source_external_key")
   @@unique([sourceId, contentHash], map: "raw_items_source_hash_key")
@@ -154,12 +168,54 @@ model NormalizedItem {
   createdAt         DateTime         @map("created_at") @db.Timestamptz(3)
   rawItem           RawItem          @relation(fields: [rawItemId], references: [id], onDelete: Restrict)
   signalEvidence    SignalEvidence[]
+  normalizationAttempt NormalizationAttempt?
+  deduplicationMemberships DeduplicationAssignment[] @relation("DeduplicationMember")
+  deduplicationRepresentatives DeduplicationAssignment[] @relation("DeduplicationRepresentative")
+  deduplicationMatches DeduplicationAssignment[] @relation("DeduplicationMatchedTo")
 
   @@unique([rawItemId, normalizerVersion], map: "normalized_items_raw_version_key")
+  @@unique([id, rawItemId, normalizerVersion], map: "normalized_items_attempt_identity_key")
   @@index([normalizedHash], map: "normalized_items_hash_idx")
   @@index([canonicalUrl], map: "normalized_items_canonical_url_idx")
   @@index([publishedAt], map: "normalized_items_published_idx")
   @@map("normalized_items")
+}
+
+model DeduplicationAssignment {
+  normalizedItemId               String                 @map("normalized_item_id") @db.Uuid
+  deduplicatorVersion            String                 @map("deduplicator_version") @db.VarChar(100)
+  representativeNormalizedItemId String                 @map("representative_normalized_item_id") @db.Uuid
+  matchedToNormalizedItemId      String                 @map("matched_to_normalized_item_id") @db.Uuid
+  matchKind                      DeduplicationMatchKind @map("match_kind")
+  similarity                     Float
+  timeDistanceHours              Float                  @map("time_distance_hours")
+  createdAt                      DateTime               @map("created_at") @db.Timestamptz(3)
+  normalizedItem                 NormalizedItem         @relation("DeduplicationMember", fields: [normalizedItemId], references: [id], onDelete: Restrict)
+  representativeNormalizedItem   NormalizedItem         @relation("DeduplicationRepresentative", fields: [representativeNormalizedItemId], references: [id], onDelete: Restrict)
+  matchedToNormalizedItem        NormalizedItem         @relation("DeduplicationMatchedTo", fields: [matchedToNormalizedItemId], references: [id], onDelete: Restrict)
+
+  @@id([normalizedItemId, deduplicatorVersion])
+  @@index([deduplicatorVersion, representativeNormalizedItemId], map: "deduplication_assignments_cluster_idx")
+  @@index([deduplicatorVersion, matchKind], map: "deduplication_assignments_kind_idx")
+  @@map("deduplication_assignments")
+}
+
+model NormalizationAttempt {
+  id                String              @id @db.Uuid
+  rawItemId         String              @map("raw_item_id") @db.Uuid
+  normalizerVersion String              @map("normalizer_version") @db.VarChar(100)
+  status            NormalizationStatus
+  normalizedItemId  String?             @unique(map: "normalization_attempts_normalized_item_key") @map("normalized_item_id") @db.Uuid
+  rejectionCode     String?             @map("rejection_code") @db.VarChar(100)
+  rejectionDetail   String?             @map("rejection_detail") @db.Text
+  correlationId     String              @map("correlation_id") @db.Uuid
+  createdAt         DateTime            @map("created_at") @db.Timestamptz(3)
+  rawItem           RawItem             @relation(fields: [rawItemId], references: [id], onDelete: Restrict)
+  normalizedItem    NormalizedItem?     @relation(fields: [normalizedItemId], references: [id], onDelete: Restrict)
+
+  @@unique([rawItemId, normalizerVersion], map: "normalization_attempts_raw_version_key")
+  @@index([status, createdAt], map: "normalization_attempts_status_created_idx")
+  @@map("normalization_attempts")
 }
 
 model Signal {

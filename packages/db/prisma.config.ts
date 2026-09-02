@@ -22,7 +22,7 @@ export default defineConfig({
   },
   migrations: {
     path: "prisma/migrations",
-    seed: "node --env-file-if-exists=../../.env --import tsx prisma/seed.ts",
+    seed: "pnpm exec tsx --tsconfig ../../tsconfig.typecheck.json prisma/seed.ts",
   },
   schema: "prisma/schema.prisma",
 });

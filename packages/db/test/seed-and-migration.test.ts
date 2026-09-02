@@ -8,6 +8,14 @@ const migrationPath = new URL(
   "../prisma/migrations/20260901090000_init_domain/migration.sql",
   import.meta.url,
 );
+const normalizationMigrationPath = new URL(
+  "../prisma/migrations/20260902090000_add_normalization_attempts/migration.sql",
+  import.meta.url,
+);
+const deduplicationMigrationPath = new URL(
+  "../prisma/migrations/20260902110000_add_deduplication_assignments/migration.sql",
+  import.meta.url,
+);
 
 describe("development seed contract", () => {
   it("contains ten sources and one hundred uniquely attributable raw items", () => {
@@ -42,5 +50,25 @@ describe("initial migration contract", () => {
     expect(migration).toContain('"raw_items_source_hash_key"');
     expect(migration).toContain('CONSTRAINT "recommendations_scores_check"');
     expect(migration).toContain('CREATE UNIQUE INDEX "feedback_sentiment_key"');
+  });
+
+  it("stores versioned normalization success and rejection outcomes separately", async () => {
+    const migration = await readFile(normalizationMigrationPath, "utf8");
+
+    expect(migration).toContain('CREATE TABLE "normalization_attempts"');
+    expect(migration).toContain('"normalization_attempts_raw_version_key"');
+    expect(migration).toContain('CONSTRAINT "normalization_attempts_payload_shape_check"');
+    expect(migration).toContain(
+      'FOREIGN KEY ("normalized_item_id", "raw_item_id", "normalizer_version")',
+    );
+  });
+
+  it("keeps versioned dedup evidence and metric bounds in SQL", async () => {
+    const migration = await readFile(deduplicationMigrationPath, "utf8");
+
+    expect(migration).toContain('CREATE TABLE "deduplication_assignments"');
+    expect(migration).toContain('CONSTRAINT "deduplication_assignments_metrics_check"');
+    expect(migration).toContain('CONSTRAINT "deduplication_assignments_representative_check"');
+    expect(migration).toContain('"deduplication_assignments_cluster_idx"');
   });
 });

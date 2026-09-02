@@ -1,3 +1,4 @@
+import { type RawItemIngestResult, type RawItemRepository } from "@radar/application";
 import { type RawItem, type RawItemId } from "@radar/core";
 
 import { type DatabaseClient } from "../client.js";
@@ -5,15 +6,7 @@ import { PersistenceError, RawItemIdentityConflictError } from "../errors.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { rawItemFromRecord, rawItemToCreateData } from "../mappers/raw-item-mapper.js";
 
-export type RawItemMatch = "CONTENT_HASH" | "EXTERNAL_ID" | "ID";
-
-export interface RawItemIngestResult {
-  readonly created: boolean;
-  readonly item: RawItem;
-  readonly matchedBy: RawItemMatch | null;
-}
-
-export class PrismaRawItemRepository {
+export class PrismaRawItemRepository implements RawItemRepository {
   readonly #client: DatabaseClient;
 
   constructor(client: DatabaseClient) {
@@ -27,6 +20,18 @@ export class PrismaRawItemRepository {
   async findById(id: RawItemId): Promise<RawItem | null> {
     const record = await this.#client.rawItem.findUnique({ where: { id } });
     return record === null ? null : rawItemFromRecord(record);
+  }
+
+  async list(options: { readonly limit?: number } = {}): Promise<readonly RawItem[]> {
+    const limit = options.limit ?? 1_000;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) {
+      throw new RangeError("limit must be an integer between 1 and 10000");
+    }
+    const records = await this.#client.rawItem.findMany({
+      orderBy: [{ receivedAt: "asc" }, { id: "asc" }],
+      take: limit,
+    });
+    return Object.freeze(records.map(rawItemFromRecord));
   }
 
   async ingest(rawItem: RawItem): Promise<RawItemIngestResult> {

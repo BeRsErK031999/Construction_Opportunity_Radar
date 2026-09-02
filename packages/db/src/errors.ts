@@ -16,3 +16,17 @@ export class RawItemIdentityConflictError extends PersistenceError {
     this.name = "RawItemIdentityConflictError";
   }
 }
+
+export class NormalizationIdentityConflictError extends PersistenceError {
+  constructor(message: string) {
+    super("NORMALIZATION_IDENTITY_CONFLICT", message);
+    this.name = "NormalizationIdentityConflictError";
+  }
+}
+
+export class DeduplicationIdentityConflictError extends PersistenceError {
+  constructor(message: string) {
+    super("DEDUPLICATION_IDENTITY_CONFLICT", message);
+    this.name = "DeduplicationIdentityConflictError";
+  }
+}

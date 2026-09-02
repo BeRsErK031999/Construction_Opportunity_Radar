@@ -7,6 +7,7 @@ import {
   createRawItem,
   createSource,
   isAiProcessingPermitted,
+  isSourceCollectionPermitted,
   normalizedItemId,
   normalizedItemIdentityKey,
   rawItemId,
@@ -72,6 +73,36 @@ describe("Source", () => {
         code: "TELEGRAM_PERMISSION_REQUIRED",
       }),
     );
+  });
+
+  it("separates collection permission from the stricter AI boundary", () => {
+    const reviewRequired = createSource({
+      ...validSourceInput(),
+      aiProcessingAllowed: false,
+      collectionPolicy: { parserKind: "FIXTURE_JSON", pollIntervalMinutes: null },
+      rightsBasis: null,
+      rightsStatus: "REVIEW_REQUIRED",
+      type: "FIXTURE",
+    });
+    const blocked = createSource({
+      ...validSourceInput(),
+      aiProcessingAllowed: false,
+      enabled: true,
+      rightsBasis: null,
+      rightsStatus: "BLOCKED",
+    });
+
+    expect(isSourceCollectionPermitted(reviewRequired)).toBe(true);
+    expect(isAiProcessingPermitted(reviewRequired)).toBe(false);
+    expect(isSourceCollectionPermitted(blocked)).toBe(false);
+
+    const liveReviewRequired = createSource({
+      ...validSourceInput(),
+      aiProcessingAllowed: false,
+      rightsBasis: null,
+      rightsStatus: "REVIEW_REQUIRED",
+    });
+    expect(isSourceCollectionPermitted(liveReviewRequired)).toBe(false);
   });
 });
 

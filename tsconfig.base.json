@@ -20,11 +20,13 @@
     "noEmitOnError": true,
     "baseUrl": ".",
     "paths": {
+      "@radar/application": ["packages/application/src/index.ts"],
       "@radar/config": ["packages/config/src/index.ts"],
       "@radar/contracts": ["packages/contracts/src/index.ts"],
       "@radar/core": ["packages/core/src/index.ts"],
       "@radar/db": ["packages/db/src/index.ts"],
-      "@radar/observability": ["packages/observability/src/index.ts"]
+      "@radar/observability": ["packages/observability/src/index.ts"],
+      "@radar/source-adapters": ["packages/adapters/sources/src/index.ts"]
     }
   }
 }

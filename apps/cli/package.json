@@ -1,0 +1,12 @@
+{
+  "name": "@radar/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@radar/application": "workspace:*",
+    "@radar/core": "workspace:*",
+    "@radar/db": "workspace:*",
+    "@radar/source-adapters": "workspace:*"
+  }
+}

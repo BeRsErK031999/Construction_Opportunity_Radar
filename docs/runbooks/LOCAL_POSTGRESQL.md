@@ -29,6 +29,33 @@ On a clean database the seed prints:
 
 Running `pnpm db:seed` again is safe and prints `createdRawItems: 0` while the three totals remain unchanged.
 
+## Versioned ingestion fixtures
+
+`db:seed` is the small ART-004 persistence seed. The ART-005 pipeline uses the separate checked-in `fixture-ingestion/v1` corpus:
+
+```powershell
+pnpm fixtures:ingest
+pnpm fixtures:normalize
+pnpm fixtures:deduplicate
+```
+
+On a clean migrated database it loads 10 source definitions and 200 raw candidates. Repeating the command creates zero new raw items because the repository matches `(source_id, external_id)` and `(source_id, content_hash)`. Materials from the `REVIEW_REQUIRED` source are preserved, but the ingestion summary does not count them in `aiPermissionPassedCreated`.
+
+Normalization writes one versioned attempt per raw item. Successful items become `normalized_items`; explicit rejections remain in `normalization_attempts` without a partially valid normalized row. Deduplication then writes one evidence-backed assignment per normalized item. For the checked-in v1 corpus the expected first run is:
+
+```json
+{
+  "assignments": 200,
+  "clusters": 150,
+  "created": 200,
+  "duplicates": 50,
+  "exactDuplicates": 25,
+  "nearDuplicates": 25
+}
+```
+
+Repeating normalization or deduplication is safe: each command reports `created: 0` and keeps the same totals. A changed normalization or dedup policy requires a new version instead of overwriting existing evidence.
+
 ## Verification
 
 ```powershell
@@ -36,7 +63,7 @@ pnpm db:validate
 pnpm test:integration
 ```
 
-Integration tests start an isolated PostgreSQL container, apply the checked-in migrations, verify database permission constraints and repository mapping, test RawItem idempotency/conflict behavior, and run the seed twice.
+Integration tests start an isolated PostgreSQL container, apply the checked-in migrations, verify database permission constraints and repository mapping, test RawItem idempotency/conflict behavior, run the seed twice, normalize without changing raw evidence, and prove the repeatable 200-to-150 dedup result.
 
 ## Stop and clean reset
 

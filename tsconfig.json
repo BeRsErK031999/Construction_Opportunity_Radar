@@ -1,11 +1,14 @@
 {
   "files": [],
   "references": [
+    { "path": "packages/application" },
     { "path": "packages/config" },
     { "path": "packages/contracts" },
     { "path": "packages/core" },
     { "path": "packages/db" },
     { "path": "packages/observability" },
+    { "path": "packages/adapters/sources" },
+    { "path": "apps/cli" },
     { "path": "apps/api" }
   ]
 }

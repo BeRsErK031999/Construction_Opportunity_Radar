@@ -109,15 +109,17 @@ Collectors must:
 - refuse AI enqueue when rights or `ai_processing_allowed` do not permit it;
 - use timeout, bounded retry, rate limits, and an identifying user-agent for live HTTP.
 
+Collection and AI permission are deliberately separate. A disabled or `BLOCKED` source is not fetched. `REVIEW_REQUIRED` material may be preserved as raw evidence only in the controlled fixture/manual review flow; a live source still cannot be fetched. Review material is never returned as AI-processing-permitted until the registry has both an eligible rights status and a documented basis.
+
 Telegram ingestion is not a special central path. A future permitted/partner Telegram source must implement the same source port and rights checks. Mass unauthorized scraping is out of scope.
 
 ### Raw preservation, normalization, and deduplication
 
 `RawItem` is immutable evidence. Reprocessing never deletes or rewrites the received body/payload.
 
-Normalization removes HTML/boilerplate, standardizes whitespace and dates, detects language metadata, and creates a canonical URL and normalized representation with a version. Empty/invalid input becomes an explicit rejection, not a silently missing record.
+Normalization removes HTML/boilerplate, standardizes whitespace and dates, detects language metadata, and creates a canonical URL and normalized representation with a version. Empty/invalid input becomes an explicit `normalization_attempts` rejection, not a silently missing or partially valid normalized record.
 
-Exact deduplication uses source external identity, canonical URL, and SHA-256 of normalized content. Bounded near-duplicate comparison is limited by vertical/category hints and a time window and records matching evidence. False-positive fixtures and before/after metrics protect recall.
+Exact deduplication uses source external identity, canonical URL, and SHA-256 of normalized content. `deduplicator-v1` limits near-duplicate comparison to shared source vertical hints and a seven-day window, uses three-token overlap with a `0.95` threshold, and records representative/direct-match evidence, similarity, distance, and policy version. False-positive fixtures and before/after metrics protect recall; policy changes require a new version.
 
 Several `RawItem`/`NormalizedItem` records may support one `Signal`; provenance from all supporting items remains queryable.
 
@@ -222,7 +224,9 @@ React + Vite remains deferred until after the closed MVP unless database queries
 
 - `sources`: identity, routing, rights/AI permission, parser/schedule, reliability, operational status.
 - `raw_items`: immutable source/external identity, URL, publication/receipt time, raw text/payload, content hash, correlation ID.
-- `normalized_items`: raw reference, normalizer version, title/text/language/date/entities, canonical URL, normalized hash, rejection state.
+- `normalized_items`: valid raw-derived representation with normalizer version, title/text/language/date/entities, canonical URL, and normalized hash.
+- `normalization_attempts`: versioned success/rejection outcome for every attempted raw item.
+- `deduplication_assignments`: versioned representative and direct match evidence for every normalized item.
 - `signals`: non-personalized classification/relevance/category/status, rule versions, timestamps.
 - `signal_sources`: links a signal to all supporting raw/normalized items and dedup evidence.
 - `analyses`: versioned structured AI output, facts/inferences/entities/actions, model/prompt/schema versions, status/error.

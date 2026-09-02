@@ -172,3 +172,10 @@ export const createSource = (input: CreateSourceInput): Source => {
 
 export const isAiProcessingPermitted = (source: Source): boolean =>
   source.enabled && source.aiProcessingAllowed && AI_ELIGIBLE_RIGHTS.has(source.rightsStatus);
+
+export const isSourceCollectionPermitted = (source: Source): boolean =>
+  source.enabled &&
+  source.rightsStatus !== "BLOCKED" &&
+  (source.rightsStatus !== "REVIEW_REQUIRED" ||
+    source.type === "FIXTURE" ||
+    source.type === "MANUAL");
