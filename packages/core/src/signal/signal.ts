@@ -25,8 +25,11 @@ export interface Signal {
   readonly category: string;
   readonly classifierVersion: Version;
   readonly classificationConfidence: Score;
+  readonly classificationRuleIds: readonly string[];
   readonly correlationId: CorrelationId;
   readonly createdAt: IsoDateTime;
+  readonly deduplicationRepresentativeNormalizedItemId: NormalizedItemId;
+  readonly deduplicatorVersion: Version;
   readonly id: SignalId;
   readonly normalizedItemIds: readonly NormalizedItemId[];
   readonly relevanceScore: Score;
@@ -42,8 +45,11 @@ export interface CreateSignalInput {
   readonly category: string;
   readonly classifierVersion: string;
   readonly classificationConfidence: number;
+  readonly classificationRuleIds: readonly string[];
   readonly correlationId: CorrelationId;
   readonly createdAt: string;
+  readonly deduplicationRepresentativeNormalizedItemId: NormalizedItemId;
+  readonly deduplicatorVersion: string;
   readonly id: SignalId;
   readonly normalizedItemIds: readonly NormalizedItemId[];
   readonly relevanceScore: number;
@@ -76,8 +82,11 @@ export const createSignal = (input: CreateSignalInput): Signal => {
     category: nonEmptyString(input.category, "category", 200),
     classifierVersion: version(input.classifierVersion, "classifierVersion"),
     classificationConfidence: score(input.classificationConfidence, "classificationConfidence"),
+    classificationRuleIds: uniqueValues(input.classificationRuleIds, "classificationRuleIds", 1),
     correlationId: input.correlationId,
     createdAt,
+    deduplicationRepresentativeNormalizedItemId: input.deduplicationRepresentativeNormalizedItemId,
+    deduplicatorVersion: version(input.deduplicatorVersion, "deduplicatorVersion"),
     id: input.id,
     normalizedItemIds: uniqueValues(input.normalizedItemIds, "normalizedItemIds", 1),
     relevanceScore: score(input.relevanceScore, "relevanceScore"),

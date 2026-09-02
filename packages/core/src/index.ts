@@ -1,4 +1,5 @@
 export * from "./analysis/analysis.js";
+export * from "./classification/classifier-v1.js";
 export * from "./deduplication/deduplicator-v1.js";
 export * from "./feedback/feedback.js";
 export * from "./ingestion/raw-item.js";

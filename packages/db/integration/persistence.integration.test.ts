@@ -4,13 +4,17 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import {
+  executeClassification,
   executeDeduplication,
   executeNormalization,
   ingestSource,
+  type Classifier,
   type Deduplicator,
   type RawItemNormalizer,
 } from "@radar/application";
 import {
+  CLASSIFIER_VERSION_V1,
+  classifyCandidateV1,
   correlationId,
   createRawItem,
   createSource,
@@ -21,6 +25,7 @@ import {
   normalizeRawItemV1,
   normalizedItemId,
   rawItemId,
+  SIGNAL_TAXONOMY_VERSION_V1,
   sourceId,
 } from "@radar/core";
 import {
@@ -33,6 +38,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabaseClient,
+  PrismaClassificationRepository,
   PrismaDeduplicationRepository,
   PrismaRawItemRepository,
   PrismaNormalizationOutcomeRepository,
@@ -123,6 +129,8 @@ beforeAll(async () => {
 }, 120_000);
 
 beforeEach(async () => {
+  await database().signalEvidence.deleteMany();
+  await database().signal.deleteMany();
   await database().deduplicationAssignment.deleteMany();
   await database().normalizationAttempt.deleteMany();
   await database().normalizedItem.deleteMany();
@@ -443,5 +451,98 @@ describe("PostgreSQL persistence", () => {
     expect(await deduplicationRepository.countAssignments(deduplicator.version)).toBe(200);
     expect(await deduplicationRepository.countClusters(deduplicator.version)).toBe(150);
     expect(await database().signal.count()).toBe(0);
+  });
+
+  it("classifies 150 fixture clusters repeatably and persists only permitted relevant signals", async () => {
+    const dataset = await loadFixtureDataset(fixturePath);
+    const sources = createFixtureSources(dataset);
+    const adapter = new FixtureSourceAdapter(dataset, {
+      now: () => "2026-09-02T00:00:00.000Z",
+    });
+    const sourceRepository = new PrismaSourceRepository(database());
+    const rawItemRepository = new PrismaRawItemRepository(database());
+    const normalizationRepository = new PrismaNormalizationOutcomeRepository(database());
+    const deduplicationRepository = new PrismaDeduplicationRepository(database());
+    const classificationRepository = new PrismaClassificationRepository(database());
+    const deduplicator: Deduplicator = {
+      deduplicate: deduplicateCandidatesV1,
+      version: DEDUPLICATOR_VERSION_V1,
+    };
+    const classifier: Classifier = {
+      classify: classifyCandidateV1,
+      taxonomyVersion: SIGNAL_TAXONOMY_VERSION_V1,
+      version: CLASSIFIER_VERSION_V1,
+    };
+
+    for (const source of sources) {
+      await sourceRepository.save(source);
+      await ingestSource({
+        adapter,
+        identities: {
+          createCorrelationId: () => randomUUID(),
+          createRawItemId: () => rawItemId(randomUUID()),
+        },
+        rawItems: rawItemRepository,
+        source,
+      });
+    }
+    for (const rawItem of await rawItemRepository.list({ limit: 1_000 })) {
+      await executeNormalization({
+        createdAt: "2026-09-02T00:01:00.000Z",
+        id: normalizedItemId(randomUUID()),
+        normalizer: { normalize: normalizeRawItemV1, version: NORMALIZER_VERSION_V1 },
+        rawItem,
+        repository: normalizationRepository,
+      });
+    }
+    const deduplicationCandidates = await deduplicationRepository.listCandidates({
+      limit: 1_000,
+      normalizerVersion: NORMALIZER_VERSION_V1,
+    });
+    await executeDeduplication({
+      candidates: deduplicationCandidates,
+      createdAt: "2026-09-02T00:02:00.000Z",
+      deduplicator,
+      repository: deduplicationRepository,
+    });
+
+    const classificationCandidates = await classificationRepository.listCandidates({
+      deduplicatorVersion: deduplicator.version,
+      limit: 1_000,
+    });
+    const first = await executeClassification({
+      candidates: classificationCandidates,
+      classifier,
+      createdAt: "2026-09-02T00:03:00.000Z",
+      repository: classificationRepository,
+    });
+    const second = await executeClassification({
+      candidates: classificationCandidates,
+      classifier,
+      createdAt: "2026-09-02T00:04:00.000Z",
+      repository: classificationRepository,
+    });
+
+    expect(first.metrics).toEqual({
+      aiEligible: 110,
+      construction: 63,
+      horeca: 60,
+      inputClusters: 150,
+      irrelevant: 28,
+      other: 15,
+      permissionDenied: 12,
+    });
+    expect(first.persistence).toEqual({ created: 110, existing: 0, signals: 110 });
+    expect(second.persistence).toEqual({ created: 0, existing: 110, signals: 110 });
+    expect(await classificationRepository.countSignals(classifier.version)).toBe(110);
+    expect(
+      await database().signal.count({
+        where: { evidence: { some: { source: { aiProcessingAllowed: false } } } },
+      }),
+    ).toBe(0);
+    const persistedSignals = await database().signal.findMany({
+      select: { classificationRuleIds: true },
+    });
+    expect(persistedSignals.every((signal) => signal.classificationRuleIds.length > 0)).toBe(true);
   });
 });

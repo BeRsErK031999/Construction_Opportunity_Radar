@@ -24,6 +24,7 @@
     "fixtures:ingest": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/ingest-fixtures.ts",
     "fixtures:normalize": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/normalize-fixtures.ts",
     "fixtures:deduplicate": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/deduplicate-fixtures.ts",
+    "fixtures:classify": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/classify-fixtures.ts",
     "lint": "eslint \"apps/**/*.ts\" \"packages/**/*.ts\" \"vitest*.config.ts\" --max-warnings 0",
     "format": "prettier --write \"apps/**/*.ts\" \"packages/**/*.ts\" \"scripts/**/*.mjs\" \"fixtures/**/*.json\" \"*.{json,mjs,ts,yaml,yml}\"",
     "format:check": "prettier --check \"apps/**/*.ts\" \"packages/**/*.ts\" \"scripts/**/*.mjs\" \"fixtures/**/*.json\" \"*.{json,mjs,ts,yaml,yml}\"",

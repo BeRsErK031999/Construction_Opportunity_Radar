@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-008` закрывают первую офлайн-цепочку данных: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization без изменения raw evidence и exact/near deduplication. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-009 Vertical classifier and relevance rules`.
+`ART-004`–`ART-009` закрывают первую офлайн-цепочку данных: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization, exact/near deduplication и детерминированная классификация без AI. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-010 Opportunity scoring`.
 
 Первый продуктовый контур:
 
@@ -25,8 +25,9 @@
 6. [docs/architecture/DOMAIN_MODEL.md](docs/architecture/DOMAIN_MODEL.md) — словарь ART-003, инварианты и mapping к PostgreSQL.
 7. [docs/runbooks/LOCAL_POSTGRESQL.md](docs/runbooks/LOCAL_POSTGRESQL.md) — запуск PostgreSQL, migrations, seed и integration tests.
 8. [docs/runbooks/RSS_HTTP_ADAPTER.md](docs/runbooks/RSS_HTTP_ADAPTER.md) — безопасный контракт RSS/HTTP collector и условия live smoke.
-9. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-10. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+9. [docs/runbooks/FIXTURE_CLASSIFICATION.md](docs/runbooks/FIXTURE_CLASSIFICATION.md) — правила classifier-v1, fixture-метрики и повторный запуск.
+10. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+11. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -76,9 +77,10 @@ pnpm test:integration
 pnpm fixtures:ingest
 pnpm fixtures:normalize
 pnpm fixtures:deduplicate
+pnpm fixtures:classify
 ```
 
-На проверенном корпусе итог дедупликации стабилен: 200 assignments, 150 кластеров, 25 exact- и 25 near-дублей. Evidence каждого решения хранится отдельно с версией `deduplicator-v1`; AI при этом не вызывается.
+На проверенном корпусе итог дедупликации стабилен: 200 assignments, 150 кластеров, 25 exact- и 25 near-дублей. `classifier-v1` создаёт 110 разрешённых релевантных signals, отклоняет 28 нерелевантных кластеров и 12 кластеров без разрешённого AI evidence. Повторный запуск создаёт 0 signals; AI не вызывается.
 
 ## Проверки
 
@@ -94,7 +96,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-009`: детерминированный versioned classifier/relevance baseline для `CONSTRUCTION`, `HORECA`, `OTHER`, который работает только с уникальными permitted-кандидатами и не вызывает AI.
+Реализовать `ART-010`: чистую versioned-функцию Opportunity Score из пяти факторов с breakdown, порогами и отделённым от глобального сигнала `companyFit`.
 
 ## Источники планирования
 

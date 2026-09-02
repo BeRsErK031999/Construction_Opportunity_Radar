@@ -30,3 +30,10 @@ export class DeduplicationIdentityConflictError extends PersistenceError {
     this.name = "DeduplicationIdentityConflictError";
   }
 }
+
+export class ClassificationIdentityConflictError extends PersistenceError {
+  constructor(message: string) {
+    super("CLASSIFICATION_IDENTITY_CONFLICT", message);
+    this.name = "ClassificationIdentityConflictError";
+  }
+}

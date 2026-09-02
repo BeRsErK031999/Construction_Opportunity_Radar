@@ -33,11 +33,13 @@ Examples of actions:
 - `ART-007 Normalization pipeline` is complete: `normalizer-v1` preserves raw evidence, cleans markup/boilerplate, canonicalizes URL/time/language/text, and stores versioned success or explicit rejection outcomes idempotently.
 - `ART-008 Exact and near deduplication` is complete: versioned assignments record source identity, canonical URL, normalized hash, or bounded near-text evidence. The checked-in corpus produces 200 assignments, 150 clusters, 25 exact duplicates, and 25 near duplicates; a repeat run creates zero rows.
 - `ART-006 RSS/HTTP adapter` is complete: `rss-http-v1` parses RSS 2.0 and Atom through an injected bounded HTTP transport, preserves item provenance, enforces collection permissions before I/O, and exposes retry/rate-limit/failure metrics. Offline fixtures cover idempotency, timeout, retry exhaustion, status/content/XML failures, and response-size bounds.
-- `ART-009 Vertical classifier and relevance rules` is next. It must remain deterministic, versioned, explainable, and run only after permission and deduplication.
+- `ART-009 Vertical classifier and relevance rules` is complete: `classifier-v1` selects one permitted representative per dedup cluster, classifies Construction/HoReCa/OTHER from versioned source/text rules, rejects advertisements/no-opportunity/ambiguous material, and exposes only permitted evidence to future AI work.
+- The 150 fixture clusters deterministically produce 110 AI-eligible persisted signals, 28 irrelevant decisions, and 12 permission-denied decisions. A second classification run creates zero signals; persisted signals retain dedup representative/version, taxonomy/classifier versions, matched rule IDs, and permitted provenance links.
+- `ART-010 Opportunity scoring` is next. Company fit remains profile-specific and must not be added to the global signal.
 - No approved live source has been called; no AI/delivery adapter or CI exists yet.
 - ART-002 evidence: frozen install, format check, lint, strict typecheck, 9 tests, build, dependency audit, built-server health request, and SIGINT shutdown all succeeded.
-- Current evidence: frozen install, format, lint, strict typecheck, 75 unit/contract tests, build, Prisma generation/validation, 8 PostgreSQL integration tests, dependency audit, and the local three-stage CLI flow succeed. The Docker-backed fixture run proves idempotent 200 raw -> 200 normalized -> 150 clusters.
-- The ART-001–ART-008 implementation is committed and pushed to `origin/main` through commit `eecd753`; ART-006 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
+- Current evidence: frozen install, format, lint, strict typecheck, 86 unit/contract tests, build, Prisma generation/validation, 9 PostgreSQL integration tests, dependency audit, and the local four-stage CLI flow succeed. The Docker-backed fixture run proves idempotent 200 raw -> 200 normalized -> 150 classified clusters -> 110 persisted signals.
+- The ART-001–ART-008 implementation, including ART-006, is committed and pushed to `origin/main` through commit `464aa94`; ART-009 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
 
 ## People
 

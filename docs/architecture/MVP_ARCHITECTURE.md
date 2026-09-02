@@ -129,7 +129,11 @@ Several `RawItem`/`NormalizedItem` records may support one `Signal`; provenance 
 
 Initial verticals are `CONSTRUCTION`, `HORECA`, and `OTHER`. Source metadata, dictionaries, region/category rules, and negative/ad patterns provide the baseline. Rules and taxonomy are versioned.
 
-Only unique, permitted, potentially relevant candidates reach AI work. Rule rejection and uncertainty are measurable; the system does not maximize filtering before recall is understood.
+`classifier-v1` consumes one `deduplicator-v1` cluster at a time. Permission is checked before text rules: if the dedup representative is not AI-permitted, the earliest permitted member becomes the classification input; if no member is permitted, the outcome is `PERMISSION_DENIED` and no text is exposed as AI input. An eligible decision exposes only permitted cluster members, while the dedup table retains the full evidence graph.
+
+The classifier combines one-point source vertical hints with explicit Construction/HoReCa dictionaries, then applies advertisement, explicit-negative, ambiguity, and opportunity-cue rules. Outcomes are `AI_ELIGIBLE`, `IRRELEVANT`, or `PERMISSION_DENIED`; every decision carries stable reason/rule IDs, vertical scores, `classifier-v1`, and `signal-taxonomy-v1`. Only `AI_ELIGIBLE` decisions become `CANDIDATE` signals. Signal identity includes the dedup representative and all three policy versions; matched rules and permitted provenance links are saved atomically.
+
+The checked-in fixture corpus produces 150 classification decisions: 110 AI-eligible signals, 28 irrelevant clusters, and 12 clusters without permitted evidence. A repeat run creates no signals. Rule rejection and uncertainty remain measurable; fixture labels are not classifier input and the system does not maximize filtering before recall is understood.
 
 ### PostgreSQL jobs
 
