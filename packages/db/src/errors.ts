@@ -37,3 +37,24 @@ export class ClassificationIdentityConflictError extends PersistenceError {
     this.name = "ClassificationIdentityConflictError";
   }
 }
+
+export class AnalysisIdentityConflictError extends PersistenceError {
+  constructor(message: string) {
+    super("ANALYSIS_IDENTITY_CONFLICT", message);
+    this.name = "AnalysisIdentityConflictError";
+  }
+}
+
+export class ProfileIdentityConflictError extends PersistenceError {
+  constructor(message: string) {
+    super("PROFILE_IDENTITY_CONFLICT", message);
+    this.name = "ProfileIdentityConflictError";
+  }
+}
+
+export class RecommendationIdentityConflictError extends PersistenceError {
+  constructor(message: string) {
+    super("RECOMMENDATION_IDENTITY_CONFLICT", message);
+    this.name = "RecommendationIdentityConflictError";
+  }
+}

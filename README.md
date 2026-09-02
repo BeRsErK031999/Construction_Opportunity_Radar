@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-012` реализуют компоненты первой офлайн-цепочки: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, profile-specific Opportunity Score, provider-independent `AIProvider` и строгий `ai-analysis/v1` контракт. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-013 Full offline pipeline`, который соединит компоненты в один повторяемый run.
+`ART-004`–`ART-013` реализуют полный независимый от реальной модели офлайн-контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score и сохранённые Recommendation. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-014 Application API`.
 
 Первый продуктовый контур:
 
@@ -81,9 +81,10 @@ pnpm fixtures:ingest
 pnpm fixtures:normalize
 pnpm fixtures:deduplicate
 pnpm fixtures:classify
+pnpm process:fixtures
 ```
 
-На проверенном корпусе итог дедупликации стабилен: 200 assignments, 150 кластеров, 25 exact- и 25 near-дублей. `classifier-v1` создаёт 110 разрешённых релевантных signals, отклоняет 28 нерелевантных кластеров и 12 кластеров без разрешённого AI evidence. Повторный запуск создаёт 0 signals; AI не вызывается.
+Первые четыре команды позволяют запускать стадии отдельно. `process:fixtures` выполняет весь контур одной командой. На проверенном корпусе результат стабилен: 200 raw, 200 normalized, 150 кластеров, 110 разрешённых signals, 110 успешных fake analyses и 110 рекомендаций для двух fixture-профилей. Повторный полный запуск создаёт 0 строк и делает 0 provider calls. Подробности — в [runbook полного офлайн-конвейера](docs/runbooks/FULL_OFFLINE_PIPELINE.md).
 
 ## Проверки
 
@@ -99,7 +100,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-013`: синхронный offline orchestrator и команду `process:fixtures`, которые соединят persistence, rules, fake analysis и scoring с идемпотентными счётчиками стадий.
+Реализовать `ART-014`: application API для health, signals, sources, user profile и feedback с Zod validation, фильтрами, authorization boundary и safe errors.
 
 ## Источники планирования
 

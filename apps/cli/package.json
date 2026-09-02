@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@radar/ai-adapters": "workspace:*",
     "@radar/application": "workspace:*",
+    "@radar/contracts": "workspace:*",
     "@radar/core": "workspace:*",
     "@radar/db": "workspace:*",
     "@radar/source-adapters": "workspace:*"

@@ -8,7 +8,9 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
+    { "path": "../../packages/adapters/ai" },
     { "path": "../../packages/application" },
+    { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/db" },
     { "path": "../../packages/adapters/sources" }

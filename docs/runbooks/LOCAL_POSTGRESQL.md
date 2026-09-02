@@ -37,6 +37,8 @@ Running `pnpm db:seed` again is safe and prints `createdRawItems: 0` while the t
 pnpm fixtures:ingest
 pnpm fixtures:normalize
 pnpm fixtures:deduplicate
+pnpm fixtures:classify
+pnpm process:fixtures
 ```
 
 On a clean migrated database it loads 10 source definitions and 200 raw candidates. Repeating the command creates zero new raw items because the repository matches `(source_id, external_id)` and `(source_id, content_hash)`. Materials from the `REVIEW_REQUIRED` source are preserved, but the ingestion summary does not count them in `aiPermissionPassedCreated`.
@@ -63,7 +65,7 @@ pnpm db:validate
 pnpm test:integration
 ```
 
-Integration tests start an isolated PostgreSQL container, apply the checked-in migrations, verify database permission constraints and repository mapping, test RawItem idempotency/conflict behavior, run the seed twice, normalize without changing raw evidence, and prove the repeatable 200-to-150 dedup result.
+Integration tests start an isolated PostgreSQL container, apply the checked-in migrations, verify database permission constraints and repository mapping, test RawItem idempotency/conflict behavior, run the seed twice, normalize without changing raw evidence, and prove the repeatable 200-to-150 dedup result plus the complete 110-analysis/110-recommendation fake-provider path.
 
 ## Stop and clean reset
 

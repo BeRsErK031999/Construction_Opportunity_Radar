@@ -8,16 +8,21 @@ import {
   executeDeduplication,
   executeNormalization,
   ingestSource,
+  processOfflinePipeline,
   type Classifier,
   type Deduplicator,
   type RawItemNormalizer,
 } from "@radar/application";
+import { FakeAIProvider } from "@radar/ai-adapters";
+import { AI_ANALYSIS_SCHEMA_VERSION_V1 } from "@radar/contracts";
 import {
   CLASSIFIER_VERSION_V1,
   classifyCandidateV1,
   correlationId,
   createRawItem,
   createSource,
+  createUser,
+  createUserProfile,
   DEDUPLICATOR_VERSION_V1,
   deduplicateCandidatesV1,
   isAiProcessingPermitted,
@@ -27,6 +32,8 @@ import {
   rawItemId,
   SIGNAL_TAXONOMY_VERSION_V1,
   sourceId,
+  userId,
+  userProfileId,
 } from "@radar/core";
 import {
   createFixtureSources,
@@ -38,11 +45,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDatabaseClient,
+  PrismaAnalysisRepository,
   PrismaClassificationRepository,
   PrismaDeduplicationRepository,
   PrismaRawItemRepository,
   PrismaNormalizationOutcomeRepository,
+  PrismaProfileRegistrationRepository,
   PrismaSourceRepository,
+  PrismaRecommendationRepository,
   RawItemIdentityConflictError,
   seedDevelopmentDatabase,
   type DatabaseClient,
@@ -116,6 +126,55 @@ const testRawItem = (overrides: {
   });
 };
 
+const testProfiles = () => [
+  {
+    profile: createUserProfile({
+      companySize: "SMALL",
+      companyType: "Construction fixture company",
+      createdAt: "2026-09-10T00:00:00Z",
+      id: userProfileId("72000000-0000-4000-8000-000000000001"),
+      interestedEventTypes: ["CONSTRUCTION_PROJECT", "CONSTRUCTION_TENDER"],
+      regions: ["Алтайский край", "Новосибирская область"],
+      revision: 1,
+      servicesAndProducts: ["Строительные материалы"],
+      updatedAt: "2026-09-10T00:00:00Z",
+      userId: userId("71000000-0000-4000-8000-000000000001"),
+      verticals: ["CONSTRUCTION"],
+    }),
+    user: createUser({
+      createdAt: "2026-09-10T00:00:00Z",
+      id: userId("71000000-0000-4000-8000-000000000001"),
+      revision: 1,
+      status: "ACTIVE",
+      telegramUserId: "integration-construction-user",
+      updatedAt: "2026-09-10T00:00:00Z",
+    }),
+  },
+  {
+    profile: createUserProfile({
+      companySize: "SMALL",
+      companyType: "HoReCa fixture company",
+      createdAt: "2026-09-10T00:00:00Z",
+      id: userProfileId("72000000-0000-4000-8000-000000000002"),
+      interestedEventTypes: ["HORECA_OPENING", "HORECA_PROCUREMENT"],
+      regions: ["Новосибирская область", "Республика Алтай"],
+      revision: 1,
+      servicesAndProducts: ["Оборудование для HoReCa"],
+      updatedAt: "2026-09-10T00:00:00Z",
+      userId: userId("71000000-0000-4000-8000-000000000002"),
+      verticals: ["HORECA"],
+    }),
+    user: createUser({
+      createdAt: "2026-09-10T00:00:00Z",
+      id: userId("71000000-0000-4000-8000-000000000002"),
+      revision: 1,
+      status: "ACTIVE",
+      telegramUserId: "integration-horeca-user",
+      updatedAt: "2026-09-10T00:00:00Z",
+    }),
+  },
+];
+
 beforeAll(async () => {
   container = await new PostgreSqlContainer("postgres:17.6-alpine")
     .withDatabase("radar_test")
@@ -129,6 +188,13 @@ beforeAll(async () => {
 }, 120_000);
 
 beforeEach(async () => {
+  await database().feedback.deleteMany();
+  await database().recommendationSource.deleteMany();
+  await database().recommendation.deleteMany();
+  await database().analysisSource.deleteMany();
+  await database().analysis.deleteMany();
+  await database().companyProfileRevision.deleteMany();
+  await database().user.deleteMany();
   await database().signalEvidence.deleteMany();
   await database().signal.deleteMany();
   await database().deduplicationAssignment.deleteMany();
@@ -544,5 +610,80 @@ describe("PostgreSQL persistence", () => {
       select: { classificationRuleIds: true },
     });
     expect(persistedSignals.every((signal) => signal.classificationRuleIds.length > 0)).toBe(true);
+  });
+
+  it("processes fixtures through fake analysis and scoring exactly once", async () => {
+    const runAt = "2026-09-10T00:00:00.000Z";
+    const dataset = await loadFixtureDataset(fixturePath);
+    const sources = createFixtureSources(dataset);
+    const client = database();
+    const repositories = {
+      analyses: new PrismaAnalysisRepository(client),
+      classification: new PrismaClassificationRepository(client),
+      deduplication: new PrismaDeduplicationRepository(client),
+      normalization: new PrismaNormalizationOutcomeRepository(client),
+      profiles: new PrismaProfileRegistrationRepository(client),
+      rawItems: new PrismaRawItemRepository(client),
+      recommendations: new PrismaRecommendationRepository(client),
+      sources: new PrismaSourceRepository(client),
+    };
+    const input = {
+      adapter: new FixtureSourceAdapter(dataset, { now: () => runAt }),
+      analysisVersion: "analysis-v1",
+      classifier: {
+        classify: classifyCandidateV1,
+        taxonomyVersion: SIGNAL_TAXONOMY_VERSION_V1,
+        version: CLASSIFIER_VERSION_V1,
+      },
+      deduplicator: {
+        deduplicate: deduplicateCandidatesV1,
+        version: DEDUPLICATOR_VERSION_V1,
+      },
+      identityNamespace: dataset.datasetId,
+      normalizer: { normalize: normalizeRawItemV1, version: NORMALIZER_VERSION_V1 },
+      profiles: testProfiles(),
+      promptVersion: "fixture-prompt-v1",
+      provider: new FakeAIProvider(),
+      repositories,
+      runAt,
+      schemaVersion: AI_ANALYSIS_SCHEMA_VERSION_V1,
+      sources,
+    } as const;
+
+    const first = await processOfflinePipeline(input);
+    const second = await processOfflinePipeline({
+      ...input,
+      adapter: new FixtureSourceAdapter(dataset, { now: () => "2026-09-10T01:00:00.000Z" }),
+      runAt: "2026-09-10T01:00:00.000Z",
+    });
+
+    expect(first).toMatchObject({
+      analysis: {
+        candidates: 110,
+        created: 110,
+        failed: 0,
+        providerCalls: 110,
+        succeeded: 110,
+        total: 110,
+      },
+      classification: { aiEligible: 110, created: 110, signals: 110 },
+      deduplication: { assignments: 200, clusters: 150, created: 200 },
+      ingestion: { aiPermissionPassedCreated: 176, created: 200, rawItems: 200, sources: 10 },
+      normalization: { attempts: 200, created: 200, normalizedItems: 200 },
+      scoring: { created: 110, eligiblePairs: 110, profiles: 2, recommendations: 110 },
+    });
+    expect(second).toMatchObject({
+      analysis: { created: 0, existing: 110, providerCalls: 0, total: 110 },
+      classification: { created: 0, existing: 110, signals: 110 },
+      deduplication: { created: 0, existing: 200 },
+      ingestion: { created: 0, existing: 200, rawItems: 200 },
+      normalization: { created: 0, existing: 200, normalizedItems: 200 },
+      scoring: { created: 0, existing: 110, recommendations: 110 },
+    });
+    expect(
+      await client.analysis.count({
+        where: { sources: { some: { source: { aiProcessingAllowed: false } } } },
+      }),
+    ).toBe(0);
   });
 });

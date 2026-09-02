@@ -43,11 +43,15 @@ Examples of actions:
 - `ART-012 Structured AI contract` is complete: `ai-analysis/v1` is a strict versioned Zod envelope for successful output with bounded text/arrays/scores, two-to-five actions, explicit facts and inferences, exact fact-source union, confidence, provider/model/prompt/schema/analysis versions, IDs, and timestamps.
 - `analysisFromAIResponseV1` accepts `unknown`, validates the schema, then matches response identity and source provenance against the permission-checked request before mapping into domain Analysis. Schema, identity, provenance, or domain drift returns a safe non-retryable `FAILED / AI_INVALID_RESPONSE` without storing raw output as a success.
 - `FakeAIProvider` now runs its generated success through the same contract mapper and can deterministically emit an invalid response for failure-path tests.
-- `ART-013 Full offline pipeline` is next; it composes the persisted fixture stages, validated fake analysis, and scoring into one idempotent command.
+- `ART-013 Full offline pipeline` is complete: the application-owned synchronous orchestrator composes persistence, rules, validated fake analysis, profile scoring, and PostgreSQL Analysis/Recommendation repositories behind `pnpm process:fixtures`.
+- A clean isolated PostgreSQL run produces 200 raw items, 200 normalized items, 150 deduplication clusters, 110 permitted signals, 110 successful analyses, and 110 recommendations for two fixture profiles. A second run with a different execution timestamp creates zero rows and makes zero provider calls.
+- Analysis failures are stored with safe stable codes; provider/request identity drift becomes `AI_INVALID_RESPONSE`. Existing analysis identity is checked before inference, and scoring remains versioned and deterministic.
+- Milestone M2 is achieved. Gate G2 is not passed because collector uptime, AI JSON success under a real model, durable-job restart, and operational duplicate metrics are not yet evidenced.
+- `ART-014 Application API` is next.
 - No approved live source or live AI endpoint has been called; no Ollama/delivery adapter or CI exists yet.
 - ART-002 evidence: frozen install, format check, lint, strict typecheck, 9 tests, build, dependency audit, built-server health request, and SIGINT shutdown all succeeded.
-- Current evidence: frozen install, format, lint, strict typecheck, 115 unit/contract tests, build, Prisma generation/validation, 9 PostgreSQL integration tests, dependency audit, and the local four-stage CLI flow succeed. The Docker-backed fixture run proves idempotent 200 raw -> 200 normalized -> 150 classified clusters -> 110 persisted signals.
-- The ART-001–ART-011 implementation is committed and pushed to `origin/main` through commit `5051b1c`; ART-012 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
+- Current evidence: frozen install, format, lint, strict typecheck, 117 unit/contract tests, build, Prisma generation/validation, 10 PostgreSQL integration tests, dependency audit, and two full local CLI runs succeed. The Docker-backed fixture run proves the idempotent 200 -> 200 -> 150 -> 110 -> 110 -> 110 chain.
+- The ART-001–ART-012 implementation is committed and pushed to `origin/main` through commit `c4e2ae8`; ART-013 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
 
 ## People
 
