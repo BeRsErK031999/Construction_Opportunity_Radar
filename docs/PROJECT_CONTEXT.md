@@ -37,11 +37,14 @@ Examples of actions:
 - The 150 fixture clusters deterministically produce 110 AI-eligible persisted signals, 28 irrelevant decisions, and 12 permission-denied decisions. A second classification run creates zero signals; persisted signals retain dedup representative/version, taxonomy/classifier versions, matched rule IDs, and permitted provenance links.
 - `ART-010 Opportunity scoring` is complete: `opportunity-score-v1` freezes the 35/25/20/10/10 formula, explicit band thresholds, per-factor contributions, probability-to-confidence conversion, and a profile-specific company-fit policy across vertical, region, event type, offering, and project value.
 - Company-fit unknowns score neutrally and remain visible in criterion reasons. An ignored event type or excluded keyword returns `EXCLUDED` without an Opportunity Score, preventing a high-impact global signal from bypassing the profile's explicit negative preferences. The scoring result maps directly into Recommendation while Signal remains global.
-- `ART-011 AI provider abstraction` is next; Ollama is not required for its fake/provider-independent slice.
-- No approved live source has been called; no AI/delivery adapter or CI exists yet.
+- `ART-011 AI provider abstraction` is complete: application owns an Ollama-free `AIProvider` port with `analyzeSignal`, `healthCheck`, `modelInfo`, provider capabilities, bounded-input metadata, and stable retryable/non-retryable failure codes.
+- `createAIAnalysisRequest` accepts domain Signal/NormalizedItem/Source values, rejects inactive signals, missing/foreign/duplicate/incomplete evidence, and sources whose AI permission is currently absent or revoked. The provider receives only a frozen sanitized snapshot with source-backed text and provenance IDs, not rights/contact metadata.
+- `FakeAIProvider` deterministically returns a domain-valid successful or failed Analysis, can throw safe typed provider errors, reports controllable health, and enforces its advertised input-character bound without Ollama or network I/O.
+- `ART-012 Structured AI contract` is next; it adds the transport-level Zod parser and negative response-validation tests around the provider boundary.
+- No approved live source or live AI endpoint has been called; no Ollama/delivery adapter or CI exists yet.
 - ART-002 evidence: frozen install, format check, lint, strict typecheck, 9 tests, build, dependency audit, built-server health request, and SIGINT shutdown all succeeded.
-- Current evidence: frozen install, format, lint, strict typecheck, 95 unit/contract tests, build, Prisma generation/validation, 9 PostgreSQL integration tests, dependency audit, and the local four-stage CLI flow succeed. The Docker-backed fixture run proves idempotent 200 raw -> 200 normalized -> 150 classified clusters -> 110 persisted signals.
-- The ART-001–ART-009 implementation is committed and pushed to `origin/main` through commit `f68d1cc`; ART-010 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
+- Current evidence: frozen install, format, lint, strict typecheck, 105 unit/contract tests, build, Prisma generation/validation, 9 PostgreSQL integration tests, dependency audit, and the local four-stage CLI flow succeed. The Docker-backed fixture run proves idempotent 200 raw -> 200 normalized -> 150 classified clusters -> 110 persisted signals.
+- The ART-001–ART-010 implementation is committed and pushed to `origin/main` through commit `6ba84a7`; ART-011 changes are local until an explicit commit/push request. No deploy, live source call, Telegram call, or Ollama call has been performed.
 
 ## People
 

@@ -7,6 +7,7 @@
     { "path": "packages/core" },
     { "path": "packages/db" },
     { "path": "packages/observability" },
+    { "path": "packages/adapters/ai" },
     { "path": "packages/adapters/sources" },
     { "path": "apps/cli" },
     { "path": "apps/api" }

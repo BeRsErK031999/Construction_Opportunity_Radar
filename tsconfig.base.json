@@ -21,6 +21,7 @@
     "baseUrl": ".",
     "paths": {
       "@radar/application": ["packages/application/src/index.ts"],
+      "@radar/ai-adapters": ["packages/adapters/ai/src/index.ts"],
       "@radar/config": ["packages/config/src/index.ts"],
       "@radar/contracts": ["packages/contracts/src/index.ts"],
       "@radar/core": ["packages/core/src/index.ts"],

@@ -7,6 +7,7 @@ const fromRoot = (path: string): string => fileURLToPath(new URL(path, import.me
 export default defineConfig({
   resolve: {
     alias: {
+      "@radar/ai-adapters": fromRoot("./packages/adapters/ai/src/index.ts"),
       "@radar/application": fromRoot("./packages/application/src/index.ts"),
       "@radar/config": fromRoot("./packages/config/src/index.ts"),
       "@radar/contracts": fromRoot("./packages/contracts/src/index.ts"),

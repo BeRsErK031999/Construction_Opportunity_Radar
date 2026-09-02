@@ -154,6 +154,10 @@ AIProvider
 
 `FakeAIProvider` is deterministic and is used in local development and CI. `OllamaAIProvider` is a later adapter. Ollama may run on the same host or a restricted private host; it is never publicly exposed.
 
+The `ART-011` application boundary builds provider input only through `createAIAnalysisRequest`. It accepts domain Signal/NormalizedItem/Source values, requires a candidate or active Signal, exact evidence coverage, unique Signal-backed item/source pairs, and rechecks the source's current `ai_processing_allowed` policy before every provider call. The resulting immutable request exposes text, canonical URL, publication time, normalized/source IDs, and classification dimensions; rights basis, owner contact, and provider-specific settings do not cross the port.
+
+Provider failures use stable codes for invalid/oversized input, timeout, unavailability, rate limiting, invalid response, and internal failure, with an explicit retryability flag and safe messages. The fake adapter supports deterministic success, domain-valid failed Analysis, typed thrown failure, healthy/unhealthy state, and an advertised input-character bound. It performs no network call. Transport-level parsing of arbitrary model output remains the responsibility of `ART-012`.
+
 The versioned `SignalAnalysis` contract includes at least:
 
 ```text

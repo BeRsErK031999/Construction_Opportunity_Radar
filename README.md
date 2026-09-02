@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-010` закрывают детерминированную часть первой офлайн-цепочки: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization, exact/near deduplication, классификация без AI и profile-specific Opportunity Score. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-011 AI provider abstraction`.
+`ART-004`–`ART-010` закрывают детерминированную часть первой офлайн-цепочки: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization, exact/near deduplication, классификация без AI и profile-specific Opportunity Score. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. `ART-011` добавляет provider-independent `AIProvider`, повторную permission-проверку перед AI и детерминированный fake-адаптер. Следующий critical-path пункт — `ART-012 Structured AI contract`.
 
 Первый продуктовый контур:
 
@@ -27,8 +27,9 @@
 8. [docs/runbooks/RSS_HTTP_ADAPTER.md](docs/runbooks/RSS_HTTP_ADAPTER.md) — безопасный контракт RSS/HTTP collector и условия live smoke.
 9. [docs/runbooks/FIXTURE_CLASSIFICATION.md](docs/runbooks/FIXTURE_CLASSIFICATION.md) — правила classifier-v1, fixture-метрики и повторный запуск.
 10. [docs/runbooks/OPPORTUNITY_SCORING.md](docs/runbooks/OPPORTUNITY_SCORING.md) — формула, company-fit rules, bands и guardrails scoring-v1.
-11. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-12. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+11. [docs/runbooks/FAKE_AI_PROVIDER.md](docs/runbooks/FAKE_AI_PROVIDER.md) — provider-neutral AI contract, permission boundary, fake-режимы и failure taxonomy.
+12. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+13. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -97,7 +98,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-011`: provider-independent порт `AIProvider` и детерминированный `FakeAIProvider` с управляемыми успехами/ошибками без Ollama.
+Реализовать `ART-012`: versioned Zod-контракт AI output с негативными contract tests и запретом успешного статуса для невалидного ответа.
 
 ## Источники планирования
 

@@ -67,6 +67,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/adapters/sources
 
+  packages/adapters/ai:
+    dependencies:
+      '@radar/application':
+        specifier: workspace:*
+        version: link:../../application
+      '@radar/core':
+        specifier: workspace:*
+        version: link:../../core
+
   packages/adapters/sources:
     dependencies:
       '@radar/application':

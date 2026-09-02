@@ -81,5 +81,5 @@ Domain остаётся независимым от способа хранен�
 - Application repository ports принадлежат use cases; Prisma repositories реализуют их в `packages/db`, не раскрывая generated-типы наружу.
 - Полноценная оркестрация стадий и durable job для classification остаются в `ART-013`/`ART-018`; текущая CLI-команда проверяет те же application/domain boundaries синхронно.
 - Сохранение Recommendation через application repository и полный analysis/profile orchestration выполняются в `ART-013`; `ART-010` уже выдаёт валидированный breakdown, version, total, band и explanation для существующей persistence-модели.
-- Zod-валидация AI output и provider failure taxonomy относятся к `ART-011`–`ART-012`.
+- Provider port, permission-safe request builder и failure taxonomy реализованы в `ART-011`; Zod-валидация произвольного AI output остаётся в `ART-012`.
 - `Subscription`, `Delivery`, digest и callback idempotency получают собственные модели в `ART-015`–`ART-018`.
