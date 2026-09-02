@@ -2,14 +2,26 @@ import { randomUUID } from "node:crypto";
 
 import {
   BotApplicationError,
+  deliverTelegramDigest,
   deliverTelegramOpportunities,
   getTelegramUserProfile,
   submitTelegramDeliveryFeedback,
   type DeliveryPort,
+  type DigestDeliveryPort,
   type TelegramFeedbackAction,
   type TelegramUiRepositories,
 } from "@radar/application";
-import { deliveryId, feedbackId, type DeliveryId } from "@radar/core";
+import {
+  correlationId,
+  deliveryId,
+  digestDeliveryId,
+  digestId,
+  feedbackId,
+  type CorrelationId,
+  type DeliveryId,
+  type DigestDeliveryId,
+  type DigestId,
+} from "@radar/core";
 
 import { deterministicUuid } from "./identity.js";
 
@@ -53,8 +65,11 @@ export interface BotCallbackInteraction extends BotInteraction {
 }
 
 export interface BotControllerOptions {
+  readonly correlationIdFactory?: () => CorrelationId;
   readonly deliveryIdFactory?: () => DeliveryId;
-  readonly deliveryPort: DeliveryPort;
+  readonly deliveryPort: DeliveryPort & DigestDeliveryPort;
+  readonly digestDeliveryIdFactory?: () => DigestDeliveryId;
+  readonly digestIdFactory?: () => DigestId;
   readonly messenger: BotMessenger;
   readonly now?: () => string;
   readonly repositories: TelegramUiRepositories;
@@ -107,15 +122,23 @@ const profileText = (profile: Awaited<ReturnType<typeof getTelegramUserProfile>>
 };
 
 export class BotController {
+  readonly #correlationIdFactory: () => CorrelationId;
   readonly #deliveryIdFactory: () => DeliveryId;
-  readonly #deliveryPort: DeliveryPort;
+  readonly #deliveryPort: DeliveryPort & DigestDeliveryPort;
+  readonly #digestDeliveryIdFactory: () => DigestDeliveryId;
+  readonly #digestIdFactory: () => DigestId;
   readonly #messenger: BotMessenger;
   readonly #now: () => string;
   readonly #repositories: TelegramUiRepositories;
 
   constructor(options: BotControllerOptions) {
+    this.#correlationIdFactory =
+      options.correlationIdFactory ?? (() => correlationId(randomUUID()));
     this.#deliveryIdFactory = options.deliveryIdFactory ?? (() => deliveryId(randomUUID()));
     this.#deliveryPort = options.deliveryPort;
+    this.#digestDeliveryIdFactory =
+      options.digestDeliveryIdFactory ?? (() => digestDeliveryId(randomUUID()));
+    this.#digestIdFactory = options.digestIdFactory ?? (() => digestId(randomUUID()));
     this.#messenger = options.messenger;
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#repositories = options.repositories;
@@ -165,16 +188,40 @@ export class BotController {
       });
       return;
     }
-    if (label === MAIN_MENU.digest) {
-      await this.#messenger.sendText({
-        mainMenu: true,
-        recipientExternalId: interaction.telegramUserId,
-        text: "Автоматический дайджест ещё не включён. Сейчас используйте «🔥 Новые возможности» — там доступна актуальная персональная выдача.",
-      });
-      return;
-    }
-
     try {
+      if (label === MAIN_MENU.digest) {
+        const result = await deliverTelegramDigest({
+          correlationId: this.#correlationIdFactory(),
+          digestDeliveryId: this.#digestDeliveryIdFactory(),
+          digestId: this.#digestIdFactory(),
+          kind: "DAILY",
+          now: this.#now,
+          port: this.#deliveryPort,
+          repositories: this.#repositories,
+          telegramUserId: interaction.telegramUserId,
+        });
+        if (result.opportunities === 0) {
+          await this.#messenger.sendText({
+            mainMenu: true,
+            recipientExternalId: interaction.telegramUserId,
+            text: "В сегодняшнем UTC-периоде новых возможностей для текущего профиля пока нет.",
+          });
+        } else if (result.delivery?.status === "FAILED") {
+          await this.#messenger.sendText({
+            mainMenu: true,
+            recipientExternalId: interaction.telegramUserId,
+            text: "Не удалось отправить дайджест. Повторная доставка будет добавлена в планировщике ART-018.",
+          });
+        } else if (!result.deliveryCreated) {
+          await this.#messenger.sendText({
+            mainMenu: true,
+            recipientExternalId: interaction.telegramUserId,
+            text: "Сегодняшний дайджест уже был собран и отправлен.",
+          });
+        }
+        return;
+      }
+
       if (label === MAIN_MENU.interests) {
         const profile = await getTelegramUserProfile({
           repositories: this.#repositories,

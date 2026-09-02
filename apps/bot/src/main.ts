@@ -5,6 +5,8 @@ import { loadBotConfig } from "@radar/config";
 import {
   createDatabaseClient,
   PrismaDeliveryRepository,
+  PrismaDigestDeliveryRepository,
+  PrismaDigestRepository,
   PrismaFeedbackRepository,
   PrismaProfileRegistrationRepository,
   PrismaSignalOpportunityRepository,
@@ -38,13 +40,18 @@ export const runBot = async (): Promise<void> => {
       if (botReference.current === undefined) {
         throw new Error("Telegram bot is not initialized");
       }
+      const { reply_markup: replyMarkup, ...messageOptions } = options;
       const message = await botReference.current.bot.api.sendMessage(chatId, text, {
-        ...options,
-        reply_markup: {
-          inline_keyboard: options.reply_markup.inline_keyboard.map((row) =>
-            row.map((button) => ({ ...button })),
-          ),
-        },
+        ...messageOptions,
+        ...(replyMarkup === undefined
+          ? {}
+          : {
+              reply_markup: {
+                inline_keyboard: replyMarkup.inline_keyboard.map((row) =>
+                  row.map((button) => ({ ...button })),
+                ),
+              },
+            }),
       });
       return { message_id: message.message_id };
     },
@@ -54,6 +61,8 @@ export const runBot = async (): Promise<void> => {
     deliveryPort: new TelegramDeliveryAdapter(telegramClient),
     logger,
     repositories: {
+      digestDeliveries: new PrismaDigestDeliveryRepository(client),
+      digests: new PrismaDigestRepository(client),
       deliveries,
       feedback: new PrismaFeedbackRepository(client),
       profiles,

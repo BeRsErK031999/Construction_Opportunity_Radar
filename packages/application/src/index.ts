@@ -3,6 +3,7 @@ export * from "./analysis/analyze-signal.js";
 export * from "./api/application-api.js";
 export * from "./classification/classify-deduplicated-clusters.js";
 export * from "./deduplication/deduplicate-normalized-items.js";
+export * from "./digest/digest.js";
 export * from "./delivery/telegram-ui.js";
 export * from "./feedback/feedback-summary.js";
 export * from "./ingestion/errors.js";

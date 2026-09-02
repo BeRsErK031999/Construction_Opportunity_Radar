@@ -1,10 +1,18 @@
 import {
   createFeedback,
+  createPendingDigestDelivery,
   createPendingDelivery,
+  markDigestDeliveryFailed,
+  markDigestDeliverySent,
   markDeliveryFailed,
   markDeliverySent,
+  type CorrelationId,
   type Delivery,
   type DeliveryId,
+  type DigestDelivery,
+  type DigestDeliveryId,
+  type DigestId,
+  type DigestKind,
   type Feedback,
   type FeedbackId,
   type User,
@@ -20,6 +28,12 @@ import {
   type SignalOpportunityRepository,
   type UserProfileRepository,
 } from "../api/application-api.js";
+import {
+  buildDigest,
+  digestPeriodFor,
+  type DigestRepository,
+  type DigestView,
+} from "../digest/digest.js";
 
 export const TELEGRAM_FEEDBACK_ACTIONS = [
   "USEFUL",
@@ -94,7 +108,32 @@ export interface DeliveryPort {
   sendOpportunity(input: OpportunityCardDelivery): Promise<{ readonly providerMessageId: string }>;
 }
 
+export interface DigestMessageDelivery {
+  readonly recipientExternalId: string;
+  readonly view: DigestView;
+}
+
+export interface DigestDeliveryPort {
+  sendDigest(input: DigestMessageDelivery): Promise<{ readonly providerMessageId: string }>;
+}
+
+export interface DigestDeliverySaveResult {
+  readonly created: boolean;
+  readonly delivery: DigestDelivery;
+}
+
+export interface DigestDeliveryRepository {
+  findByDigest(
+    channel: DigestDelivery["channel"],
+    digestId: DigestId,
+  ): Promise<DigestDelivery | null>;
+  findById(id: DigestDeliveryId): Promise<DigestDelivery | null>;
+  save(delivery: DigestDelivery): Promise<DigestDeliverySaveResult>;
+}
+
 export interface TelegramUiRepositories {
+  readonly digestDeliveries: DigestDeliveryRepository;
+  readonly digests: DigestRepository;
   readonly deliveries: DeliveryRepository;
   readonly feedback: FeedbackRepository;
   readonly profiles: UserProfileRepository;
@@ -102,6 +141,112 @@ export interface TelegramUiRepositories {
   readonly signals: SignalOpportunityRepository;
   readonly users: TelegramUserRepository;
 }
+
+export interface DeliverTelegramDigestResult {
+  readonly delivery: DigestDelivery | null;
+  readonly digestCreated: boolean;
+  readonly deliveryCreated: boolean;
+  readonly opportunities: number;
+  readonly view: DigestView;
+}
+
+export const deliverTelegramDigest = async (input: {
+  readonly correlationId: CorrelationId;
+  readonly digestDeliveryId: DigestDeliveryId;
+  readonly digestId: DigestId;
+  readonly kind: DigestKind;
+  readonly now: () => string;
+  readonly port: DigestDeliveryPort;
+  readonly repositories: Pick<TelegramUiRepositories, "digestDeliveries" | "digests" | "users">;
+  readonly telegramUserId: string;
+}): Promise<DeliverTelegramDigestResult> => {
+  const user = await activeUser(input.telegramUserId, input.repositories.users);
+  const now = input.now();
+  const built = await buildDigest({
+    correlationId: input.correlationId,
+    digestId: input.digestId,
+    kind: input.kind,
+    now,
+    period: digestPeriodFor(input.kind, now),
+    repository: input.repositories.digests,
+    userId: user.id,
+  });
+  if (input.kind === "DAILY" && built.view.items.length === 0) {
+    return Object.freeze({
+      delivery: null,
+      deliveryCreated: false,
+      digestCreated: built.created,
+      opportunities: 0,
+      view: built.view,
+    });
+  }
+  const existing = await input.repositories.digestDeliveries.findByDigest(
+    "TELEGRAM",
+    built.view.digest.id,
+  );
+  if (existing !== null) {
+    return Object.freeze({
+      delivery: existing,
+      deliveryCreated: false,
+      digestCreated: built.created,
+      opportunities: built.view.items.length,
+      view: built.view,
+    });
+  }
+  const savedPending = await input.repositories.digestDeliveries.save(
+    createPendingDigestDelivery({
+      channel: "TELEGRAM",
+      correlationId: built.view.digest.correlationId,
+      createdAt: now,
+      digestId: built.view.digest.id,
+      id: input.digestDeliveryId,
+      idempotencyKey: `digest:${built.view.digest.id}`,
+      userId: user.id,
+    }),
+  );
+  if (!savedPending.created) {
+    return Object.freeze({
+      delivery: savedPending.delivery,
+      deliveryCreated: false,
+      digestCreated: built.created,
+      opportunities: built.view.items.length,
+      view: built.view,
+    });
+  }
+  try {
+    const sent = await input.port.sendDigest({
+      recipientExternalId: input.telegramUserId,
+      view: built.view,
+    });
+    const saved = await input.repositories.digestDeliveries.save(
+      markDigestDeliverySent(savedPending.delivery, sent.providerMessageId, input.now()),
+    );
+    return Object.freeze({
+      delivery: saved.delivery,
+      deliveryCreated: true,
+      digestCreated: built.created,
+      opportunities: built.view.items.length,
+      view: built.view,
+    });
+  } catch (error) {
+    const failure = safeDeliveryFailure(error);
+    const saved = await input.repositories.digestDeliveries.save(
+      markDigestDeliveryFailed(
+        savedPending.delivery,
+        failure.code,
+        failure.reason.replace("карточку возможности", "дайджест"),
+        input.now(),
+      ),
+    );
+    return Object.freeze({
+      delivery: saved.delivery,
+      deliveryCreated: true,
+      digestCreated: built.created,
+      opportunities: built.view.items.length,
+      view: built.view,
+    });
+  }
+};
 
 const activeUser = async (
   telegramUserId: string,

@@ -1,5 +1,7 @@
 import {
   DeliveryTransportError,
+  type DigestDeliveryPort,
+  type DigestMessageDelivery,
   type DeliveryPort,
   type OpportunityCardDelivery,
 } from "@radar/application";
@@ -14,7 +16,7 @@ export type TelegramInlineButton =
 export interface TelegramSendMessageOptions {
   readonly link_preview_options: { readonly is_disabled: true };
   readonly parse_mode: "HTML";
-  readonly reply_markup: {
+  readonly reply_markup?: {
     readonly inline_keyboard: readonly (readonly TelegramInlineButton[])[];
   };
 }
@@ -37,7 +39,18 @@ const escapedCharacter = (character: string): string => {
   if (character === ">") {
     return "&gt;";
   }
+  if (character === '"') {
+    return "&quot;";
+  }
   return character;
+};
+
+const escapeHtml = (value: string): string => {
+  let escaped = "";
+  for (const character of value) {
+    escaped += escapedCharacter(character);
+  }
+  return escaped;
 };
 
 const escapeAndTruncate = (value: string, maximum: number): string => {
@@ -79,7 +92,7 @@ export const feedbackCallbackData = (
 export const telegramOpportunityKeyboard = (
   deliveryId: string,
   sourceUrl: string,
-): TelegramSendMessageOptions["reply_markup"] => ({
+): NonNullable<TelegramSendMessageOptions["reply_markup"]> => ({
   inline_keyboard: [
     [
       { callback_data: feedbackCallbackData("u", deliveryId), text: "👍 Полезно" },
@@ -129,7 +142,73 @@ export const renderTelegramOpportunity = (card: OpportunityCardDelivery["card"])
   return text;
 };
 
-export class TelegramDeliveryAdapter implements DeliveryPort {
+const digestItemText = (item: DigestMessageDelivery["view"]["items"][number]): string => {
+  const primarySource = item.opportunity.sources[0];
+  if (primarySource === undefined) {
+    throw new DeliveryTransportError(
+      "TELEGRAM_DIGEST_ITEM_WITHOUT_SOURCE",
+      "Рекомендация дайджеста не содержит ссылку на источник",
+      false,
+    );
+  }
+  const firstAction = [...item.opportunity.recommendation.recommendedActions].sort(
+    (left, right) => left.priority - right.priority,
+  )[0];
+  const category = item.opportunity.signal.category.replaceAll("_", " ");
+  const sourceUrl = escapeHtml(primarySource.canonicalUrl);
+  if (sourceUrl.length > 1_000) {
+    throw new DeliveryTransportError(
+      "TELEGRAM_DIGEST_SOURCE_URL_TOO_LONG",
+      "Ссылка на источник в дайджесте превышает безопасный лимит",
+      false,
+    );
+  }
+  return [
+    `${String(item.rank)}. <b>${String(Math.round(item.opportunity.recommendation.totalScore))}/100 · ${escapeAndTruncate(category, 80)}</b>`,
+    escapeAndTruncate(item.opportunity.analysis.headline, 180),
+    ...(firstAction === undefined
+      ? []
+      : [`Действие: ${escapeAndTruncate(firstAction.title, 120)}`]),
+    `<a href="${sourceUrl}">${escapeAndTruncate(primarySource.sourceName, 80)}</a>`,
+  ].join("\n");
+};
+
+export const renderTelegramDigest = (input: DigestMessageDelivery["view"]): string => {
+  const summary = input.digest.weeklySummary;
+  const inclusivePeriodEnd = new Date(Date.parse(input.digest.periodEnd) - 1).toISOString();
+  const weeklyLines =
+    summary === null
+      ? []
+      : [
+          `Обработано: ${String(summary.processed)}`,
+          `Уникальных: ${String(summary.unique)}`,
+          `Релевантных сигналов: ${String(summary.relevant)}`,
+          `Возможностей: ${String(summary.opportunities)}`,
+          `Высокий приоритет: ${String(summary.highPriority)}`,
+          ...(summary.categoryTrends.length === 0
+            ? ["Растущие категории: нет подтверждённого роста"]
+            : [
+                "Растущие категории:",
+                ...summary.categoryTrends.map(
+                  (trend) =>
+                    `• ${escapeAndTruncate(trend.category.replaceAll("_", " "), 100)}: +${String(trend.delta)}`,
+                ),
+              ]),
+        ];
+  return [
+    input.digest.kind === "DAILY" ? "📊 <b>Главные возможности дня</b>" : "📊 <b>Итоги недели</b>",
+    input.digest.kind === "DAILY"
+      ? `${input.digest.periodStart.slice(0, 10)} UTC`
+      : `${input.digest.periodStart.slice(0, 10)} — ${inclusivePeriodEnd.slice(0, 10)} UTC`,
+    ...weeklyLines,
+    "",
+    ...input.items.flatMap((item) => [digestItemText(item), ""]),
+  ]
+    .join("\n")
+    .trimEnd();
+};
+
+export class TelegramDeliveryAdapter implements DeliveryPort, DigestDeliveryPort {
   readonly #client: TelegramMessageClient;
 
   constructor(client: TelegramMessageClient) {
@@ -174,6 +253,29 @@ export class TelegramDeliveryAdapter implements DeliveryPort {
         "Telegram не принял карточку возможности",
         true,
       );
+    }
+  }
+
+  async sendDigest(input: DigestMessageDelivery): Promise<{ readonly providerMessageId: string }> {
+    try {
+      const text = renderTelegramDigest(input.view);
+      if (text.length > TELEGRAM_TEXT_LIMIT) {
+        throw new DeliveryTransportError(
+          "TELEGRAM_DIGEST_TOO_LONG",
+          "Дайджест превышает лимит Telegram",
+          false,
+        );
+      }
+      const response = await this.#client.sendMessage(input.recipientExternalId, text, {
+        link_preview_options: { is_disabled: true },
+        parse_mode: "HTML",
+      });
+      return Object.freeze({ providerMessageId: String(response.message_id) });
+    } catch (error) {
+      if (error instanceof DeliveryTransportError) {
+        throw error;
+      }
+      throw new DeliveryTransportError("TELEGRAM_SEND_FAILED", "Telegram не принял дайджест", true);
     }
   }
 }

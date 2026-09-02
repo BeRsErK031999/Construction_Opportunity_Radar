@@ -65,7 +65,7 @@ pnpm db:validate
 pnpm test:integration
 ```
 
-Integration tests start an isolated PostgreSQL container, apply the checked-in migrations, verify database permission constraints and repository mapping, test RawItem idempotency/conflict behavior, run the seed twice, normalize without changing raw evidence, and prove the repeatable 200-to-150 dedup result plus the complete 110-analysis/110-recommendation fake-provider path.
+Integration tests start an isolated PostgreSQL container, apply the checked-in migrations, verify database permission/profile/delivery constraints and repository mapping, test RawItem idempotency/conflict behavior, run the seed twice, normalize without changing raw evidence, and prove the repeatable 200-to-150 dedup result plus the complete 110-analysis/110-recommendation fake-provider path, daily/weekly Digest and idempotent digest delivery.
 
 ## Stop and clean reset
 

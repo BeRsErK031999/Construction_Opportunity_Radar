@@ -7,6 +7,8 @@ type Identifier<Name extends string> = string & { readonly [brand]: Name };
 export type AnalysisId = Identifier<"AnalysisId">;
 export type CorrelationId = Identifier<"CorrelationId">;
 export type DeliveryId = Identifier<"DeliveryId">;
+export type DigestDeliveryId = Identifier<"DigestDeliveryId">;
+export type DigestId = Identifier<"DigestId">;
 export type FactId = Identifier<"FactId">;
 export type FeedbackId = Identifier<"FeedbackId">;
 export type InferenceId = Identifier<"InferenceId">;
@@ -31,6 +33,9 @@ export const correlationId = (value: string): CorrelationId =>
   identifier(value, "correlationId") as CorrelationId;
 export const deliveryId = (value: string): DeliveryId =>
   identifier(value, "deliveryId") as DeliveryId;
+export const digestDeliveryId = (value: string): DigestDeliveryId =>
+  identifier(value, "digestDeliveryId") as DigestDeliveryId;
+export const digestId = (value: string): DigestId => identifier(value, "digestId") as DigestId;
 export const factId = (value: string): FactId => identifier(value, "factId") as FactId;
 export const feedbackId = (value: string): FeedbackId =>
   identifier(value, "feedbackId") as FeedbackId;

@@ -7,11 +7,16 @@ import {
   createUser,
   createUserProfile,
   deliveryId,
+  digestDeliveryId,
+  digestId,
   markDeliverySent,
   recommendationId,
+  signalId,
   userId,
   userProfileId,
   type FeedbackAction,
+  type Digest,
+  type DigestDelivery,
 } from "@radar/core";
 import { FakeDeliveryAdapter } from "@radar/delivery-adapters";
 
@@ -50,6 +55,7 @@ const profile = createUserProfile({
 });
 
 const dependencies = () => {
+  let storedDigest: Digest | null = null;
   const messages: Parameters<BotMessenger["sendText"]>[0][] = [];
   const answers: Parameters<BotMessenger["answerCallback"]>[0][] = [];
   const messenger: BotMessenger = {
@@ -63,6 +69,42 @@ const dependencies = () => {
     },
   };
   const repositories: TelegramUiRepositories = {
+    digestDeliveries: {
+      findByDigest() {
+        return Promise.resolve(null);
+      },
+      findById() {
+        return Promise.resolve(null);
+      },
+      save(delivery) {
+        return Promise.resolve({ created: true, delivery });
+      },
+    },
+    digests: {
+      collectBuildSnapshot() {
+        return Promise.resolve({
+          candidates: [],
+          previousCandidates: [],
+          processed: 0,
+          relevant: 0,
+          unique: 0,
+          userProfileId: PROFILE_ID,
+          userProfileRevision: 1,
+        });
+      },
+      findByIdentity() {
+        return Promise.resolve(storedDigest);
+      },
+      findView(id) {
+        return Promise.resolve(
+          storedDigest?.id === id ? { digest: storedDigest, items: [] } : null,
+        );
+      },
+      save(digest) {
+        storedDigest = digest;
+        return Promise.resolve({ created: true, digest });
+      },
+    },
     deliveries: {
       findById() {
         return Promise.resolve(null);
@@ -148,7 +190,7 @@ describe("Telegram bot controller", () => {
     expect(state.messages[0]?.text).toContain("Радар возможностей готов");
   });
 
-  it("shows profile interests and honest placeholders for not-yet-built digest behavior", async () => {
+  it("shows profile interests, an empty current digest, and saved-state guidance", async () => {
     const state = dependencies();
 
     await state.controller.menu(interaction, MAIN_MENU.interests);
@@ -157,8 +199,90 @@ describe("Telegram bot controller", () => {
 
     expect(state.messages[0]?.text).toContain("Алтайский край");
     expect(state.messages[0]?.text).toContain("Бетон");
-    expect(state.messages[1]?.text).toContain("ещё не включён");
+    expect(state.messages[1]?.text).toContain("новых возможностей");
+    expect(state.messages[1]?.text).toContain("UTC-периоде");
     expect(state.messages[2]?.text).toContain("Сохранённых возможностей пока нет");
+  });
+
+  it("delivers the current daily digest once and reports a replay", async () => {
+    const state = dependencies();
+    const adapter = new FakeDeliveryAdapter();
+    let storedDigest: Digest | null = null;
+    let storedDelivery: DigestDelivery | null = null;
+    state.controller = new BotController({
+      correlationIdFactory: () => correlationId("70000000-0000-4000-8000-000000000010"),
+      deliveryPort: adapter,
+      digestDeliveryIdFactory: () => digestDeliveryId("70000000-0000-4000-8000-000000000011"),
+      digestIdFactory: () => digestId("70000000-0000-4000-8000-000000000012"),
+      messenger: {
+        answerCallback() {
+          return Promise.resolve();
+        },
+        sendText(input) {
+          state.messages.push(input);
+          return Promise.resolve();
+        },
+      },
+      now: () => "2026-09-02T12:00:00.000Z",
+      repositories: {
+        ...state.repositories,
+        digestDeliveries: {
+          findByDigest() {
+            return Promise.resolve(storedDelivery);
+          },
+          findById() {
+            return Promise.resolve(storedDelivery);
+          },
+          save(delivery) {
+            const created = storedDelivery === null;
+            storedDelivery = delivery;
+            return Promise.resolve({ created, delivery });
+          },
+        },
+        digests: {
+          collectBuildSnapshot() {
+            return Promise.resolve({
+              candidates: [
+                {
+                  band: "HIGH" as const,
+                  category: "PROJECT_START",
+                  createdAt: NOW,
+                  recommendationId: recommendationId("40000000-0000-4000-8000-000000000001"),
+                  signalId: signalId("50000000-0000-4000-8000-000000000001"),
+                  totalScore: 84,
+                },
+              ],
+              previousCandidates: [],
+              processed: 1,
+              relevant: 1,
+              unique: 1,
+              userProfileId: PROFILE_ID,
+              userProfileRevision: 1,
+            });
+          },
+          findByIdentity() {
+            return Promise.resolve(storedDigest);
+          },
+          findView(id) {
+            return Promise.resolve(
+              storedDigest?.id === id
+                ? { digest: storedDigest, items: [{ opportunity: {} as never, rank: 1 }] }
+                : null,
+            );
+          },
+          save(digest) {
+            storedDigest = digest;
+            return Promise.resolve({ created: true, digest });
+          },
+        },
+      },
+    });
+
+    await state.controller.menu(interaction, MAIN_MENU.digest);
+    await state.controller.menu(interaction, MAIN_MENU.digest);
+
+    expect(adapter.sentDigests).toHaveLength(1);
+    expect(state.messages.at(-1)?.text).toContain("уже был собран и отправлен");
   });
 
   it("returns an actionable message for an unknown closed-MVP user", async () => {

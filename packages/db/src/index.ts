@@ -4,6 +4,8 @@ export * from "./errors.js";
 export * from "./repositories/analysis-repository.js";
 export * from "./repositories/classification-repository.js";
 export * from "./repositories/deduplication-repository.js";
+export * from "./repositories/digest-delivery-repository.js";
+export * from "./repositories/digest-repository.js";
 export * from "./repositories/delivery-repository.js";
 export * from "./repositories/feedback-repository.js";
 export * from "./repositories/raw-item-repository.js";

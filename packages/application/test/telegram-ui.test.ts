@@ -180,6 +180,31 @@ const state = () => {
   const deliveries = new Map<string, Delivery>();
   const feedback = new Map<string, Feedback>();
   const repositories: TelegramUiRepositories = {
+    digestDeliveries: {
+      findByDigest() {
+        return Promise.resolve(null);
+      },
+      findById() {
+        return Promise.resolve(null);
+      },
+      save(delivery) {
+        return Promise.resolve({ created: true, delivery });
+      },
+    },
+    digests: {
+      collectBuildSnapshot() {
+        return Promise.resolve(null);
+      },
+      findByIdentity() {
+        return Promise.resolve(null);
+      },
+      findView() {
+        return Promise.resolve(null);
+      },
+      save(digest) {
+        return Promise.resolve({ created: true, digest });
+      },
+    },
     deliveries: {
       findById(id) {
         return Promise.resolve(deliveries.get(id) ?? null);

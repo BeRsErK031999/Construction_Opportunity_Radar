@@ -1,6 +1,10 @@
 import { Bot, Keyboard, type Context } from "grammy";
 
-import { type DeliveryPort, type TelegramUiRepositories } from "@radar/application";
+import {
+  type DeliveryPort,
+  type DigestDeliveryPort,
+  type TelegramUiRepositories,
+} from "@radar/application";
 import { type AppLogger } from "@radar/observability";
 
 import {
@@ -12,7 +16,7 @@ import {
 } from "./controller.js";
 
 export interface BuildBotOptions {
-  readonly deliveryPort: DeliveryPort;
+  readonly deliveryPort: DeliveryPort & DigestDeliveryPort;
   readonly logger: AppLogger;
   readonly repositories: TelegramUiRepositories;
   readonly token: string;

@@ -14,7 +14,7 @@ import { analysisFromRecord } from "../mappers/analysis-mapper.js";
 import { recommendationFromRecord } from "../mappers/recommendation-mapper.js";
 import { signalFromRecord } from "../mappers/signal-mapper.js";
 
-const opportunityInclude = {
+export const signalOpportunityInclude = {
   analysis: { include: { sources: true } },
   signal: {
     include: {
@@ -24,11 +24,11 @@ const opportunityInclude = {
   sources: true,
 } as const;
 
-type OpportunityRecord = Prisma.RecommendationGetPayload<{
-  include: typeof opportunityInclude;
+export type SignalOpportunityRecord = Prisma.RecommendationGetPayload<{
+  include: typeof signalOpportunityInclude;
 }>;
 
-const fromRecord = (record: OpportunityRecord): SignalOpportunity => {
+export const signalOpportunityFromRecord = (record: SignalOpportunityRecord): SignalOpportunity => {
   const analysis = analysisFromRecord(record.analysis);
   if (analysis.status !== "SUCCEEDED") {
     throw new PersistenceError(
@@ -94,7 +94,7 @@ export class PrismaSignalOpportunityRepository
       return null;
     }
     const record = await this.#client.recommendation.findFirst({
-      include: opportunityInclude,
+      include: signalOpportunityInclude,
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       where: {
         signalId,
@@ -102,7 +102,7 @@ export class PrismaSignalOpportunityRepository
         userProfileRevision: profile.revision,
       },
     });
-    return record === null ? null : fromRecord(record);
+    return record === null ? null : signalOpportunityFromRecord(record);
   }
 
   async listForUser(userId: UserId, filter: SignalListFilter): Promise<Page<SignalOpportunity>> {
@@ -112,7 +112,7 @@ export class PrismaSignalOpportunityRepository
     }
     const records = await this.#client.recommendation.findMany({
       ...(filter.after === undefined ? {} : { cursor: { id: filter.after }, skip: 1 }),
-      include: opportunityInclude,
+      include: signalOpportunityInclude,
       orderBy: [{ totalScore: "desc" }, { createdAt: "desc" }, { id: "asc" }],
       take: filter.limit + 1,
       where: {
@@ -125,14 +125,14 @@ export class PrismaSignalOpportunityRepository
     const hasNextPage = records.length > filter.limit;
     const selected = records.slice(0, filter.limit);
     return Object.freeze({
-      items: Object.freeze(selected.map(fromRecord)),
+      items: Object.freeze(selected.map(signalOpportunityFromRecord)),
       nextCursor: hasNextPage ? (selected.at(-1)?.id ?? null) : null,
     });
   }
 
   async listSavedForUser(userId: UserId, limit: number): Promise<readonly SignalOpportunity[]> {
     const records = await this.#client.recommendation.findMany({
-      include: opportunityInclude,
+      include: signalOpportunityInclude,
       orderBy: [{ totalScore: "desc" }, { createdAt: "desc" }, { id: "asc" }],
       take: limit,
       where: {
@@ -140,6 +140,6 @@ export class PrismaSignalOpportunityRepository
         userProfile: { userId },
       },
     });
-    return Object.freeze(records.map(fromRecord));
+    return Object.freeze(records.map(signalOpportunityFromRecord));
   }
 }

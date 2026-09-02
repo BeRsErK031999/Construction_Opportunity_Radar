@@ -2,7 +2,7 @@
 
 ## Назначение и границы
 
-`ART-015` добавляет отдельный grammY-процесс для закрытого MVP; `ART-016` завершает его feedback-кнопки. Бот работает только в private chat и показывает уже созданные персональные Recommendation из PostgreSQL; он не собирает контент Telegram и не вызывает AI.
+`ART-015` добавляет отдельный grammY-процесс для закрытого MVP; `ART-016` завершает его feedback-кнопки, а `ART-017` подключает on-demand daily digest. Бот работает только в private chat и показывает уже созданные персональные Recommendation из PostgreSQL; он не собирает контент Telegram и не вызывает AI.
 
 Главное меню зафиксировано продуктовым контрактом:
 
@@ -12,7 +12,7 @@
 - `⚙️ Мои интересы`;
 - `ℹ️ Помощь`.
 
-Карточка содержит Opportunity Score, вертикаль, summary, объяснение важности, первые два-три приоритетных рекомендуемых действия и ссылку на разрешённый первоисточник. Inline-кнопки сохраняют `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED` или `ALREADY_KNOWN`. Автоматический digest, настройка частоты и изменение профиля через Telegram не имитируются: UI прямо сообщает, что эти функции ещё не включены.
+Карточка содержит Opportunity Score, вертикаль, summary, объяснение важности, первые два-три приоритетных рекомендуемых действия и ссылку на разрешённый первоисточник. Inline-кнопки сохраняют `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED` или `ALREADY_KNOWN`. `📊 Дайджест` собирает текущий UTC daily top-5 один раз и повторно использует сохранённый снимок; автоматическое расписание, настройка частоты и изменение профиля через Telegram ещё не включены.
 
 ## Delivery и idempotency
 
@@ -41,7 +41,7 @@ pnpm build
 pnpm db:validate
 ```
 
-`FakeDeliveryAdapter` проверяет application orchestration и replay. Инъецированный `TelegramMessageClient` проверяет HTML escaping, длину текста, пять feedback-кнопок, callback payload и mapping ответа без сети. PostgreSQL integration test подтверждает `PENDING -> SENT`, отсутствие повторной отправки, concurrent feedback idempotency, все пять outcomes, персональную feedback-сводку и выдачу сохранённой карточки.
+`FakeDeliveryAdapter` проверяет application orchestration и replay карточек/дайджестов. Инъецированный `TelegramMessageClient` проверяет HTML escaping, длину текста, source links, пять feedback-кнопок, callback payload и mapping ответа без сети. PostgreSQL integration test подтверждает `PENDING -> SENT`, отсутствие повторной отправки карточки и Digest, concurrent feedback idempotency, все пять outcomes, персональную feedback-сводку и выдачу сохранённой карточки.
 
 ## Подготовка локальной базы
 
@@ -87,7 +87,7 @@ Live smoke выполняется только по отдельному зап�
 1. убедиться, что PostgreSQL слушает только localhost и migrations применены;
 2. связать свой Telegram user ID с отдельным тестовым профилем;
 3. запустить bot-процесс и открыть `/start` в private chat;
-4. проверить все пять пунктов меню и одну карточку;
+4. проверить все пять пунктов меню, одну карточку и `📊 Дайджест`;
 5. проверить пять feedback-кнопок, повторить callback и убедиться, что feedback не дублируется;
 6. проверить `Сохраненные`, source URL и отсутствие token/user ID в logs;
 7. остановить процесс через `Ctrl+C`.
@@ -99,4 +99,5 @@ Live smoke выполняется только по отдельному зап�
 - Transport error сохраняет `FAILED`; пользователю предлагается повторить запрос позже.
 - Повтор того же interaction не переотправляет terminal Delivery. Новый пользовательский запрос создаёт новую interaction identity.
 - `PENDING`, оставшийся после аварии процесса, не отправляется автоматически. Lease/retry/stale recovery принадлежат `ART-018 Durable jobs and scheduler`.
+- `FAILED` Digest не переотправляется нажатием кнопки; controlled retry также принадлежит `ART-018`.
 - Если профиль отсутствует или отключён, бот не раскрывает данные и предлагает обратиться к администратору закрытого MVP.

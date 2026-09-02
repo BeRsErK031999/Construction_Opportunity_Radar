@@ -1,6 +1,6 @@
 # Domain model
 
-Статус: базовая модель реализована в `ART-003`; operational outcomes нормализации, дедупликации, Telegram-доставки и feedback loop уточнены в `ART-007`–`ART-016`, 2026-09-02.
+Статус: базовая модель реализована в `ART-003`; operational outcomes нормализации, дедупликации, Telegram-доставки, feedback loop и Digest уточнены в `ART-007`–`ART-017`, 2026-09-02.
 
 ## Назначение и граница
 
@@ -15,7 +15,8 @@ Source
   -> Signal
   -> Analysis
   -> Recommendation <- UserProfile <- User
-  -> Delivery
+  -> Digest -> DigestDelivery
+  -> Delivery (individual card)
   -> Feedback
 ```
 
@@ -44,7 +45,9 @@ Source
 | `User`              | Минимальная Telegram identity и lifecycle                      | Нет имени, телефона и другой необязательной PII; revision положительна; timestamps упорядочены.                                                                                                                                                                                                                                                   |
 | `UserProfile`       | Данные компании и интересы для deterministic fit               | До G4 только Construction/HoReCa; regions и services/products непустые; positive/negative keywords и event types не пересекаются; monetary range неотрицательный и упорядоченный.                                                                                                                                                                 |
 | `Recommendation`    | Персональная оценка одного signal/analysis для ревизии profile | Все пять факторов и total в `0..100`; scoring version явна; от двух до пяти уникальных действий; provenance не пуст; identity включает profile revision.                                                                                                                                                                                          |
+| `Digest`            | Неизменяемый персональный daily/weekly снимок                  | Identity включает user/kind/UTC period/version; profile revision явна; не более пяти уникальных Recommendation с rank `1..5`; только weekly хранит activity summary и до пяти положительных category delta.                                                                                                                                         |
 | `Delivery`          | Попытка доставить Recommendation пользователю                  | Канал, вид, user/recommendation/correlation и idempotency key обязательны; `PENDING` не имеет outcome, `SENT` хранит provider message ID, `FAILED` — только безопасные code/reason; terminal outcome неизменяем.                                                                                                                                  |
+| `DigestDelivery`    | Попытка доставить один Digest пользователю                     | User обязан совпадать с владельцем Digest; один outcome на channel/digest; `PENDING`, `SENT`, `FAILED` имеют ту же взаимоисключающую форму, что карточка; terminal outcome неизменяем.                                                                                                                                                               |
 | `Feedback`          | Одно attributable действие пользователя                        | Только `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, `ALREADY_KNOWN`; всегда есть user/recommendation/correlation, delivery и reason опциональны; повторы определяются по user/recommendation/action, а `USEFUL` и `NOT_USEFUL` взаимоисключаются.                                                                                                    |
 
 `Analysis.confidence` — вероятность `0..1` из structured AI contract. `opportunity-score-v1` явно преобразует её в `Recommendation.scoreBreakdown.confidence` диапазона `0..100`; модель не управляет весами, thresholds или арифметикой.
@@ -65,7 +68,9 @@ Domain остаётся независимым от способа хранен�
 | `User`                    | `users`                                                                                                                                                                   | PK `id`; unique Telegram user ID; enum status; check revision; не добавлять необязательную PII.                                                                                                                                                                          |
 | `UserProfile`             | append-only `company_profile_revisions` с composite key `(id, revision)`                                                                                                  | FK user; positive revision; одна current revision определяется максимальной revision либо отдельным pointer; JSON/array для малых interest-наборов, GIN только после измерения запросов.                                                                                 |
 | `Recommendation`          | `recommendations`; breakdown — отдельные numeric columns, actions `jsonb`; `recommendation_sources` для provenance                                                        | PK `id`; FK signal, analysis и composite FK profile/revision; unique identity tuple с `scoring_version`; checks `0..100`; unique source links.                                                                                                                           |
+| `Digest`                  | `digests`, ranked `digest_items`, `digest_category_trends`                                                                                                                | PK `id`; unique user/kind/period/version; FK user и profile revision; UTC day/week period checks; summary только для weekly; item/trend rank `1..5`; Recommendation links не дублируются.                                                                                |
 | `Delivery`                | `deliveries`; transport identity и outcome хранятся отдельно от Recommendation                                                                                            | PK `id`; FK user/recommendation; unique `(channel, idempotency_key)` и `(channel, user_id, provider_message_id)`, потому что Telegram message ID локален для чата; check взаимоисключающих `PENDING`/`SENT`/`FAILED` outcome; индексы user/status/time и recommendation. |
+| `DigestDelivery`          | `digest_deliveries`; transport outcome отдельно от card Delivery                                                                                                          | PK `id`; composite FK digest/user; unique `(channel, digest_id)`, idempotency key и provider message в пределах user/channel; outcome/time checks.                                                                                                                     |
 | `Feedback`                | `feedback` как append-only actions                                                                                                                                        | PK `id`; FK user/recommendation; composite FK `(delivery_id, user_id, recommendation_id)` гарантирует единый context; unique `(user_id, recommendation_id, action)`; partial unique sentiment key не допускает одновременно `USEFUL` и `NOT_USEFUL`; index created time. |
 
 ### Транзакционные границы
@@ -76,7 +81,9 @@ Domain остаётся независимым от способа хранен�
 - Classification проверяет permission ещё раз на application-boundary; только `AI_ELIGIBLE` signal и его permitted provenance links создаются в одной транзакции. Совместимый повтор возвращает существующий signal, несовместимое содержимое под тем же deterministic ID считается identity conflict.
 - Analysis и его queryable source links сохраняются вместе; невалидный provider output создаёт только typed failure.
 - Recommendation фиксирует конкретную profile revision и scoring version, поэтому последующее изменение профиля не меняет историческое объяснение.
+- Digest сохраняет ranked Recommendation и weekly metrics одной repeatable-read сборки; первый insert по user/kind/period/version выигрывает concurrent identity race и остаётся неизменяемым.
 - Delivery создаётся в `PENDING` до transport-вызова и атомарно переходит только в один terminal outcome. Повтор interaction/recommendation identity возвращает существующую запись и не отправляет карточку повторно.
+- DigestDelivery создаётся до transport-вызова; unique channel/digest предотвращает последовательную повторную отправку. Recovery зависшего `PENDING` и retry `FAILED` принадлежат durable jobs ART-018.
 - Feedback insert идемпотентен по identity key, включая конкурентные callback-и с разными transport ID; первая запись action сохраняет attribution/reason неизменно. Конфликт sentiment обрабатывается явной application-командой, а не тихим overwrite.
 
 ## Отложено намеренно
@@ -85,4 +92,4 @@ Domain остаётся независимым от способа хранен�
 - Полноценная оркестрация стадий и durable job для classification остаются в `ART-013`/`ART-018`; текущая CLI-команда проверяет те же application/domain boundaries синхронно.
 - Сохранение Recommendation через application repository и полный analysis/profile orchestration выполняются в `ART-013`; `ART-010` уже выдаёт валидированный breakdown, version, total, band и explanation для существующей persistence-модели.
 - Provider port, permission-safe request builder и failure taxonomy реализованы в `ART-011`; strict `ai-analysis/v1` и mapping невалидного ответа в failed Analysis реализованы в `ART-012`. Persistence/orchestration этих результатов остаются в `ART-013`.
-- `Subscription`, сборка digest, расписание и recovery зависших delivery получают собственные модели и orchestration в `ART-017`–`ART-018`.
+- `Subscription`, расписание, overlap protection и recovery зависших Delivery/DigestDelivery получают durable orchestration в `ART-018`.

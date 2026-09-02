@@ -24,6 +24,14 @@ const feedbackContextMigrationPath = new URL(
   "../prisma/migrations/20260902170000_enforce_feedback_delivery_context/migration.sql",
   import.meta.url,
 );
+const digestMigrationPath = new URL(
+  "../prisma/migrations/20260902190000_add_digests/migration.sql",
+  import.meta.url,
+);
+const digestProfileContextMigrationPath = new URL(
+  "../prisma/migrations/20260902193000_enforce_digest_profile_context/migration.sql",
+  import.meta.url,
+);
 
 describe("development seed contract", () => {
   it("contains ten sources and one hundred uniquely attributable raw items", () => {
@@ -97,5 +105,28 @@ describe("initial migration contract", () => {
     expect(migration).toContain('"deliveries_feedback_context_key"');
     expect(migration).toContain('CONSTRAINT "feedback_delivery_context_fkey"');
     expect(migration).toContain('FOREIGN KEY ("delivery_id", "user_id", "recommendation_id")');
+  });
+
+  it("persists versioned digest snapshots and one delivery per period", async () => {
+    const migration = await readFile(digestMigrationPath, "utf8");
+
+    expect(migration).toContain('CREATE TABLE "digests"');
+    expect(migration).toContain('CREATE TABLE "digest_items"');
+    expect(migration).toContain('CREATE TABLE "digest_category_trends"');
+    expect(migration).toContain('CREATE TABLE "digest_deliveries"');
+    expect(migration).toContain('CONSTRAINT "digests_summary_shape_check"');
+    expect(migration).toContain('"digests_identity_key"');
+    expect(migration).toContain('"digest_deliveries_channel_digest_key"');
+    expect(migration).toContain('CONSTRAINT "digest_deliveries_digest_user_fkey"');
+  });
+
+  it("binds a digest profile revision to the same user", async () => {
+    const migration = await readFile(digestProfileContextMigrationPath, "utf8");
+
+    expect(migration).toContain('"company_profile_identity_user_key"');
+    expect(migration).toContain('CONSTRAINT "digests_user_profile_context_fkey"');
+    expect(migration).toContain(
+      'FOREIGN KEY ("user_profile_id", "user_profile_revision", "user_id")',
+    );
   });
 });

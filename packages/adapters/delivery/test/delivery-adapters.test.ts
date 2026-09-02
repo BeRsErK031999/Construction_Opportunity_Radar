@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { deliveryId, normalizedItemId, sourceId } from "@radar/core";
+import { type DigestView, type SignalOpportunity } from "@radar/application";
+import {
+  correlationId,
+  createDigest,
+  deliveryId,
+  digestId,
+  normalizedItemId,
+  recommendationId,
+  sourceId,
+  userId,
+  userProfileId,
+} from "@radar/core";
 
 import {
   FakeDeliveryAdapter,
@@ -8,6 +19,7 @@ import {
   TELEGRAM_TEXT_LIMIT,
   TelegramDeliveryAdapter,
   feedbackCallbackData,
+  renderTelegramDigest,
   renderTelegramOpportunity,
   type TelegramMessageClient,
 } from "../src/index.js";
@@ -43,6 +55,51 @@ const card = () => ({
   summary: "В регионе объявлено строительство объекта.",
   vertical: "CONSTRUCTION" as const,
   whyImportant: "Проекту потребуются материалы и подрядчики.",
+});
+
+const digestView = (): DigestView => ({
+  digest: createDigest({
+    correlationId: correlationId("40000000-0000-4000-8000-000000000001"),
+    createdAt: "2026-09-02T12:00:00.000Z",
+    id: digestId("50000000-0000-4000-8000-000000000001"),
+    items: [
+      {
+        rank: 1,
+        recommendationId: recommendationId("60000000-0000-4000-8000-000000000001"),
+      },
+    ],
+    kind: "WEEKLY",
+    periodEnd: "2026-09-07T00:00:00.000Z",
+    periodStart: "2026-08-31T00:00:00.000Z",
+    userId: userId("70000000-0000-4000-8000-000000000001"),
+    userProfileId: userProfileId("80000000-0000-4000-8000-000000000001"),
+    userProfileRevision: 1,
+    version: "digest-v1",
+    weeklySummary: {
+      categoryTrends: [
+        { category: "PROJECT_START", currentCount: 3, delta: 2, previousCount: 1, rank: 1 },
+      ],
+      highPriority: 1,
+      opportunities: 1,
+      processed: 20,
+      relevant: 8,
+      unique: 12,
+    },
+  }),
+  items: [
+    {
+      opportunity: {
+        analysis: { headline: card().headline },
+        recommendation: {
+          recommendedActions: card().actions,
+          totalScore: card().score,
+        },
+        signal: { category: "PROJECT_START" },
+        sources: card().sources,
+      } as unknown as SignalOpportunity,
+      rank: 1,
+    },
+  ],
 });
 
 describe("delivery adapters", () => {
@@ -104,5 +161,29 @@ describe("delivery adapters", () => {
     expect(JSON.stringify(sent[0])).toContain("✅ Взяли в работу");
     expect(JSON.stringify(sent[0])).toContain("🙈 Уже знали");
     expect(JSON.stringify(sent[0])).toContain("https://example.test/item?a=1&b=2");
+  });
+
+  it("renders and sends a bounded weekly digest with metrics and source provenance", async () => {
+    const sent: unknown[] = [];
+    const client: TelegramMessageClient = {
+      sendMessage(chatId, text, options) {
+        sent.push({ chatId, options, text });
+        return Promise.resolve({ message_id: 43 });
+      },
+    };
+    const adapter = new TelegramDeliveryAdapter(client);
+    const view = digestView();
+
+    const result = await adapter.sendDigest({ recipientExternalId: "123", view });
+    const text = renderTelegramDigest(view);
+
+    expect(result).toEqual({ providerMessageId: "43" });
+    expect(text).toContain("Итоги недели");
+    expect(text).toContain("Обработано: 20");
+    expect(text).toContain("PROJECT START: +2");
+    expect(text).toContain("Официальный &lt;реестр&gt;");
+    expect(text).toContain("https://example.test/item?a=1&amp;b=2");
+    expect(text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_LIMIT);
+    expect(sent).toHaveLength(1);
   });
 });

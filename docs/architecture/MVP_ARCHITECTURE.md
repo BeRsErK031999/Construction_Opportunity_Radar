@@ -222,11 +222,13 @@ Fastify exposes health first, then signals, sources, profiles, and feedback. All
 
 ### Telegram delivery
 
-Use grammY and long polling for the closed MVP behind `DeliveryPort`. ART-015 implements private-chat access for pre-registered users, the exact five-item menu, current and saved opportunity cards, profile inspection, help, and card feedback. Interactive onboarding/profile editing, frequency, and scheduled digest remain separate product steps.
+Use grammY and long polling for the closed MVP behind semantic delivery ports. ART-015 implements private-chat access for pre-registered users, the exact five-item menu, current and saved opportunity cards, profile inspection, help, and card feedback. ART-017 makes the Digest menu build and deliver an idempotent current UTC daily top-5; weekly construction uses the same application boundary. Interactive onboarding/profile editing, frequency, durable retry, and scheduled delivery remain separate product steps.
 
 Cards show score, why it matters, the first two-to-three prioritized practical actions, and the permitted source link. A `Delivery` is persisted as `PENDING` before transport and then as immutable `SENT` or `FAILED`; `(channel, interaction + recommendation)` makes replay idempotent. Callback payloads carry only a compact action and delivery UUID, then persist feedback with the user/recommendation/delivery/correlation chain. A fake delivery adapter supports local/CI tests without a token.
 
 The bot is a delivery interface, not a reader for arbitrary third-party channels. Tokens remain only in secrets/env and never in Git or logs; no live Bot API call is part of the offline verification path.
+
+`digest-v1` reads compact, persisted Recommendation data only. One immutable Digest is identified by user, kind, UTC period, and version; it records the profile revision and up to five ranked Recommendation links. Weekly summaries store stage activity counts and positive category deltas against the previous equal period. `DigestDelivery` is separate from card Delivery so digest idempotency cannot weaken the Delivery/user/Recommendation foreign key used by Feedback.
 
 ### Feedback and outcomes
 
@@ -252,7 +254,9 @@ React + Vite remains deferred until after the closed MVP unless database queries
 - `recommendations`: signal/analysis/profile tuple, factor breakdown, total/band, explanation, actions, versions.
 - `users`: Telegram identity and lifecycle status without unnecessary PII.
 - `subscriptions`: topics, regions, frequency, delivery state.
-- `deliveries`: digest/recommendation transport attempt, idempotency/provider reference, status/error.
+- `deliveries`: individual Recommendation-card transport attempt, idempotency/provider reference, status/error.
+- `digests`, `digest_items`, `digest_category_trends`: versioned daily/weekly snapshot, ranked Recommendation links, profile/period identity, weekly metrics and category deltas.
+- `digest_deliveries`: one idempotent Telegram outcome per persisted Digest; scheduling and retry leases are added by ART-018.
 - `feedback`: action/reason/outcome with user, recommendation/delivery, timestamps.
 - `processing_jobs`: durable work, lease, retries, scheduling, and failure history.
 

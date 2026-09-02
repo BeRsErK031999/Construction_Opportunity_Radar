@@ -115,6 +115,11 @@ enum DeliveryStatus {
   FAILED
 }
 
+enum DigestKind {
+  DAILY
+  WEEKLY
+}
+
 model Source {
   id                    String                 @id @db.Uuid
   name                  String                 @db.VarChar(300)
@@ -146,18 +151,18 @@ model Source {
 }
 
 model RawItem {
-  id              String           @id @db.Uuid
-  sourceId        String           @map("source_id") @db.Uuid
-  externalId      String?          @map("external_id") @db.VarChar(500)
-  originalUrl     String           @map("original_url") @db.Text
-  publishedAt     DateTime?        @map("published_at") @db.Timestamptz(3)
-  receivedAt      DateTime         @map("received_at") @db.Timestamptz(3)
-  rawText         String           @map("raw_text") @db.Text
-  rawPayload      Json?            @map("raw_payload") @db.JsonB
-  contentHash     String           @map("content_hash") @db.Char(64)
-  correlationId   String           @map("correlation_id") @db.Uuid
-  source          Source           @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  normalizedItems NormalizedItem[]
+  id                    String                 @id @db.Uuid
+  sourceId              String                 @map("source_id") @db.Uuid
+  externalId            String?                @map("external_id") @db.VarChar(500)
+  originalUrl           String                 @map("original_url") @db.Text
+  publishedAt           DateTime?              @map("published_at") @db.Timestamptz(3)
+  receivedAt            DateTime               @map("received_at") @db.Timestamptz(3)
+  rawText               String                 @map("raw_text") @db.Text
+  rawPayload            Json?                  @map("raw_payload") @db.JsonB
+  contentHash           String                 @map("content_hash") @db.Char(64)
+  correlationId         String                 @map("correlation_id") @db.Uuid
+  source                Source                 @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  normalizedItems       NormalizedItem[]
   normalizationAttempts NormalizationAttempt[]
 
   @@unique([sourceId, externalId], map: "raw_items_source_external_key")
@@ -168,25 +173,25 @@ model RawItem {
 }
 
 model NormalizedItem {
-  id                String           @id @db.Uuid
-  rawItemId         String           @map("raw_item_id") @db.Uuid
-  normalizerVersion String           @map("normalizer_version") @db.VarChar(100)
-  title             String?          @db.VarChar(1000)
-  text              String           @db.Text
-  language          String           @db.VarChar(35)
-  publishedAt       DateTime?        @map("published_at") @db.Timestamptz(3)
-  canonicalUrl      String           @map("canonical_url") @db.Text
-  entities          Json             @default("[]") @db.JsonB
-  normalizedHash    String           @map("normalized_hash") @db.Char(64)
-  correlationId     String           @map("correlation_id") @db.Uuid
-  createdAt         DateTime         @map("created_at") @db.Timestamptz(3)
-  rawItem           RawItem          @relation(fields: [rawItemId], references: [id], onDelete: Restrict)
-  signalEvidence    SignalEvidence[]
-  normalizationAttempt NormalizationAttempt?
-  deduplicationMemberships DeduplicationAssignment[] @relation("DeduplicationMember")
+  id                           String                    @id @db.Uuid
+  rawItemId                    String                    @map("raw_item_id") @db.Uuid
+  normalizerVersion            String                    @map("normalizer_version") @db.VarChar(100)
+  title                        String?                   @db.VarChar(1000)
+  text                         String                    @db.Text
+  language                     String                    @db.VarChar(35)
+  publishedAt                  DateTime?                 @map("published_at") @db.Timestamptz(3)
+  canonicalUrl                 String                    @map("canonical_url") @db.Text
+  entities                     Json                      @default("[]") @db.JsonB
+  normalizedHash               String                    @map("normalized_hash") @db.Char(64)
+  correlationId                String                    @map("correlation_id") @db.Uuid
+  createdAt                    DateTime                  @map("created_at") @db.Timestamptz(3)
+  rawItem                      RawItem                   @relation(fields: [rawItemId], references: [id], onDelete: Restrict)
+  signalEvidence               SignalEvidence[]
+  normalizationAttempt         NormalizationAttempt?
+  deduplicationMemberships     DeduplicationAssignment[] @relation("DeduplicationMember")
   deduplicationRepresentatives DeduplicationAssignment[] @relation("DeduplicationRepresentative")
-  deduplicationMatches DeduplicationAssignment[] @relation("DeduplicationMatchedTo")
-  representedSignals Signal[] @relation("SignalDeduplicationRepresentative")
+  deduplicationMatches         DeduplicationAssignment[] @relation("DeduplicationMatchedTo")
+  representedSignals           Signal[]                  @relation("SignalDeduplicationRepresentative")
 
   @@unique([rawItemId, normalizerVersion], map: "normalized_items_raw_version_key")
   @@unique([id, rawItemId, normalizerVersion], map: "normalized_items_attempt_identity_key")
@@ -234,30 +239,30 @@ model NormalizationAttempt {
 }
 
 model Signal {
-  id                       String           @id @db.Uuid
-  vertical                 Vertical
-  category                 String           @db.VarChar(200)
-  relevanceScore           Float            @map("relevance_score")
-  classificationConfidence Float            @map("classification_confidence")
-  classificationRuleIds    String[]         @map("classification_rule_ids")
-  classifierVersion        String           @map("classifier_version") @db.VarChar(100)
-  taxonomyVersion          String           @map("taxonomy_version") @db.VarChar(100)
-  deduplicatorVersion      String           @map("deduplicator_version") @db.VarChar(100)
-  deduplicationRepresentativeNormalizedItemId String @map("deduplication_representative_normalized_item_id") @db.Uuid
-  status                   SignalStatus
-  supersededBySignalId     String?          @map("superseded_by_signal_id") @db.Uuid
-  correlationId            String           @map("correlation_id") @db.Uuid
-  createdAt                DateTime         @map("created_at") @db.Timestamptz(3)
-  updatedAt                DateTime         @map("updated_at") @db.Timestamptz(3)
-  supersededBy             Signal?          @relation("SignalSupersession", fields: [supersededBySignalId], references: [id], onDelete: Restrict)
-  supersedes               Signal[]         @relation("SignalSupersession")
-  deduplicationRepresentative NormalizedItem @relation("SignalDeduplicationRepresentative", fields: [deduplicationRepresentativeNormalizedItemId], references: [id], onDelete: Restrict)
-  evidence                 SignalEvidence[]
-  analyses                 Analysis[]
-  recommendations          Recommendation[]
+  id                                          String           @id @db.Uuid
+  vertical                                    Vertical
+  category                                    String           @db.VarChar(200)
+  relevanceScore                              Float            @map("relevance_score")
+  classificationConfidence                    Float            @map("classification_confidence")
+  classificationRuleIds                       String[]         @map("classification_rule_ids")
+  classifierVersion                           String           @map("classifier_version") @db.VarChar(100)
+  taxonomyVersion                             String           @map("taxonomy_version") @db.VarChar(100)
+  deduplicatorVersion                         String           @map("deduplicator_version") @db.VarChar(100)
+  deduplicationRepresentativeNormalizedItemId String           @map("deduplication_representative_normalized_item_id") @db.Uuid
+  status                                      SignalStatus
+  supersededBySignalId                        String?          @map("superseded_by_signal_id") @db.Uuid
+  correlationId                               String           @map("correlation_id") @db.Uuid
+  createdAt                                   DateTime         @map("created_at") @db.Timestamptz(3)
+  updatedAt                                   DateTime         @map("updated_at") @db.Timestamptz(3)
+  supersededBy                                Signal?          @relation("SignalSupersession", fields: [supersededBySignalId], references: [id], onDelete: Restrict)
+  supersedes                                  Signal[]         @relation("SignalSupersession")
+  deduplicationRepresentative                 NormalizedItem   @relation("SignalDeduplicationRepresentative", fields: [deduplicationRepresentativeNormalizedItemId], references: [id], onDelete: Restrict)
+  evidence                                    SignalEvidence[]
+  analyses                                    Analysis[]
+  recommendations                             Recommendation[]
 
-  @@index([vertical, category, status, createdAt], map: "signals_discovery_idx")
   @@unique([deduplicationRepresentativeNormalizedItemId, deduplicatorVersion, classifierVersion, taxonomyVersion], map: "signals_classification_identity_key")
+  @@index([vertical, category, status, createdAt], map: "signals_discovery_idx")
   @@map("signals")
 }
 
@@ -325,15 +330,17 @@ model AnalysisSource {
 }
 
 model User {
-  id             String                   @id @db.Uuid
-  telegramUserId String                   @unique(map: "users_telegram_user_key") @map("telegram_user_id") @db.VarChar(100)
-  status         UserStatus
-  revision       Int
-  createdAt      DateTime                 @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime                 @map("updated_at") @db.Timestamptz(3)
-  profiles       CompanyProfileRevision[]
-  feedback       Feedback[]
-  deliveries     Delivery[]
+  id               String                   @id @db.Uuid
+  telegramUserId   String                   @unique(map: "users_telegram_user_key") @map("telegram_user_id") @db.VarChar(100)
+  status           UserStatus
+  revision         Int
+  createdAt        DateTime                 @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime                 @map("updated_at") @db.Timestamptz(3)
+  profiles         CompanyProfileRevision[]
+  feedback         Feedback[]
+  deliveries       Delivery[]
+  digests          Digest[]
+  digestDeliveries DigestDelivery[]
 
   @@map("users")
 }
@@ -359,8 +366,10 @@ model CompanyProfileRevision {
   updatedAt            DateTime          @map("updated_at") @db.Timestamptz(3)
   user                 User              @relation(fields: [userId], references: [id], onDelete: Restrict)
   recommendations      Recommendation[]
+  digests              Digest[]
 
   @@id([id, revision])
+  @@unique([id, revision, userId], map: "company_profile_identity_user_key")
   @@index([userId, revision], map: "company_profile_user_revision_idx")
   @@map("company_profile_revisions")
 }
@@ -389,10 +398,89 @@ model Recommendation {
   sources             RecommendationSource[]
   feedback            Feedback[]
   deliveries          Delivery[]
+  digestItems         DigestItem[]
 
   @@unique([signalId, analysisId, userProfileId, userProfileRevision, scoringVersion], map: "recommendations_identity_key")
   @@index([userProfileId, userProfileRevision, band, totalScore], map: "recommendations_profile_score_idx")
   @@map("recommendations")
+}
+
+model Digest {
+  id                  String                 @id @db.Uuid
+  userId              String                 @map("user_id") @db.Uuid
+  userProfileId       String                 @map("user_profile_id") @db.Uuid
+  userProfileRevision Int                    @map("user_profile_revision")
+  kind                DigestKind
+  periodStart         DateTime               @map("period_start") @db.Timestamptz(3)
+  periodEnd           DateTime               @map("period_end") @db.Timestamptz(3)
+  digestVersion       String                 @map("digest_version") @db.VarChar(100)
+  processedCount      Int?                   @map("processed_count")
+  uniqueCount         Int?                   @map("unique_count")
+  relevantCount       Int?                   @map("relevant_count")
+  opportunityCount    Int?                   @map("opportunity_count")
+  highPriorityCount   Int?                   @map("high_priority_count")
+  correlationId       String                 @map("correlation_id") @db.Uuid
+  createdAt           DateTime               @map("created_at") @db.Timestamptz(3)
+  user                User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userProfile         CompanyProfileRevision @relation(fields: [userProfileId, userProfileRevision, userId], references: [id, revision, userId], onDelete: Restrict)
+  items               DigestItem[]
+  categoryTrends      DigestCategoryTrend[]
+  deliveries          DigestDelivery[]
+
+  @@unique([id, userId], map: "digests_id_user_key")
+  @@unique([userId, kind, periodStart, periodEnd, digestVersion], map: "digests_identity_key")
+  @@index([userId, kind, periodStart], map: "digests_user_kind_period_idx")
+  @@map("digests")
+}
+
+model DigestItem {
+  digestId         String         @map("digest_id") @db.Uuid
+  recommendationId String         @map("recommendation_id") @db.Uuid
+  rank             Int
+  digest           Digest         @relation(fields: [digestId], references: [id], onDelete: Cascade)
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+
+  @@id([digestId, recommendationId])
+  @@unique([digestId, rank], map: "digest_items_rank_key")
+  @@index([recommendationId], map: "digest_items_recommendation_idx")
+  @@map("digest_items")
+}
+
+model DigestCategoryTrend {
+  digestId      String @map("digest_id") @db.Uuid
+  category      String @db.VarChar(200)
+  currentCount  Int    @map("current_count")
+  previousCount Int    @map("previous_count")
+  delta         Int
+  rank          Int
+  digest        Digest @relation(fields: [digestId], references: [id], onDelete: Cascade)
+
+  @@id([digestId, category])
+  @@unique([digestId, rank], map: "digest_category_trends_rank_key")
+  @@map("digest_category_trends")
+}
+
+model DigestDelivery {
+  id                String          @id @db.Uuid
+  digestId          String          @map("digest_id") @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  channel           DeliveryChannel
+  idempotencyKey    String          @map("idempotency_key") @db.VarChar(200)
+  status            DeliveryStatus
+  providerMessageId String?         @map("provider_message_id") @db.VarChar(200)
+  failureCode       String?         @map("failure_code") @db.VarChar(100)
+  failureReason     String?         @map("failure_reason") @db.Text
+  correlationId     String          @map("correlation_id") @db.Uuid
+  createdAt         DateTime        @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @map("updated_at") @db.Timestamptz(3)
+  digest            Digest          @relation(fields: [digestId, userId], references: [id, userId], onDelete: Restrict)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([channel, digestId], map: "digest_deliveries_channel_digest_key")
+  @@unique([channel, idempotencyKey], map: "digest_deliveries_channel_idempotency_key")
+  @@unique([channel, userId, providerMessageId], map: "digest_deliveries_channel_user_provider_message_key")
+  @@index([userId, status, createdAt], map: "digest_deliveries_user_status_created_idx")
+  @@map("digest_deliveries")
 }
 
 model Delivery {

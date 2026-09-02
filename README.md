@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-016` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI и feedback loop. grammY-бот принимает все пять MVP-действий, а персональная API-сводка показывает coverage, sentiment, channel attribution и высокооценённые, но неполезные карточки. Следующий critical-path пункт — `ART-017 Digest`.
+`ART-004`–`ART-017` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop и versioned Digest. grammY-бот принимает все пять MVP-действий и доставляет on-demand daily top-5; weekly summary содержит pipeline-метрики и рост категорий. Следующий critical-path пункт — `ART-018 Durable jobs and scheduler`.
 
 Первый продуктовый контур:
 
@@ -32,8 +32,9 @@
 13. [docs/presentation/http/README.md](docs/presentation/http/README.md) — private HTTP API v1, endpoints, поля, auth, ошибки и pagination.
 14. [docs/runbooks/TELEGRAM_UI.md](docs/runbooks/TELEGRAM_UI.md) — меню, карточка, delivery state, offline-проверка и условия live smoke.
 15. [docs/runbooks/FEEDBACK_LOOP.md](docs/runbooks/FEEDBACK_LOOP.md) — пять outcomes, idempotency, определения метрик и rollback constraint.
-16. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-17. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+16. [docs/runbooks/DIGEST.md](docs/runbooks/DIGEST.md) — daily/weekly periods, top-5, weekly metrics, idempotency и recovery.
+17. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+18. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -98,7 +99,7 @@ pnpm process:fixtures
 pnpm bot:dev
 ```
 
-Токен нельзя добавлять в Git или командную строку; сохраните его только в ignored `.env`. Карточка принимает `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, `ALREADY_KNOWN`; автоматический дайджест и изменение профиля в Telegram пока не включены. Полная подготовка и безопасный live smoke описаны в [Telegram runbook](docs/runbooks/TELEGRAM_UI.md).
+Токен нельзя добавлять в Git или командную строку; сохраните его только в ignored `.env`. Карточка принимает `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, `ALREADY_KNOWN`; пункт `📊 Дайджест` собирает и один раз доставляет current UTC daily top-5. Автоматическое расписание, выбор частоты и изменение профиля в Telegram пока не включены. Полная подготовка и безопасный live smoke описаны в [Telegram runbook](docs/runbooks/TELEGRAM_UI.md).
 
 ## Проверки
 
@@ -114,7 +115,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-017`: детерминированный daily top-5 и weekly summary из compact Recommendation с полной source/delivery traceability и защитой от повторной сборки.
+Реализовать `ART-018`: PostgreSQL-backed durable jobs и scheduler для стадий pipeline, включая `buildDigest`/`deliverDigest`, с transactional claim, bounded retry, stale-lock recovery и restart evidence.
 
 ## Источники планирования
 

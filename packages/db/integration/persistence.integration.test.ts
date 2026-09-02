@@ -7,7 +7,10 @@ import {
   executeClassification,
   executeDeduplication,
   executeNormalization,
+  buildDigest,
+  deliverTelegramDigest,
   deliverTelegramOpportunities,
+  digestPeriodFor,
   getUserFeedbackSummary,
   ingestSource,
   listSignalOpportunities,
@@ -34,6 +37,8 @@ import {
   DEDUPLICATOR_VERSION_V1,
   deduplicateCandidatesV1,
   deliveryId,
+  digestDeliveryId,
+  digestId,
   feedbackId,
   isAiProcessingPermitted,
   markDeliveryFailed,
@@ -60,6 +65,8 @@ import {
   PrismaAnalysisRepository,
   PrismaClassificationRepository,
   PrismaDeduplicationRepository,
+  PrismaDigestDeliveryRepository,
+  PrismaDigestRepository,
   PrismaDeliveryRepository,
   PrismaFeedbackRepository,
   PrismaRawItemRepository,
@@ -205,6 +212,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   await database().feedback.deleteMany();
   await database().delivery.deleteMany();
+  await database().digestDelivery.deleteMany();
+  await database().digest.deleteMany();
   await database().recommendationSource.deleteMany();
   await database().recommendation.deleteMany();
   await database().analysisSource.deleteMany();
@@ -731,6 +740,106 @@ describe("PostgreSQL persistence", () => {
         firstOpportunity.signal.id,
       ),
     ).toMatchObject({ signal: { id: firstOpportunity.signal.id } });
+
+    const digestRepository = new PrismaDigestRepository(client);
+    const dailyDigest = await buildDigest({
+      correlationId: correlationId("77000000-0000-4000-8000-000000000001"),
+      digestId: digestId("78000000-0000-4000-8000-000000000001"),
+      kind: "DAILY",
+      now: "2026-09-10T01:10:00.000Z",
+      period: digestPeriodFor("DAILY", "2026-09-10T01:10:00.000Z"),
+      repository: digestRepository,
+      userId: constructionRegistration.user.id,
+    });
+    const weeklyDigest = await buildDigest({
+      correlationId: correlationId("77000000-0000-4000-8000-000000000002"),
+      digestId: digestId("78000000-0000-4000-8000-000000000002"),
+      kind: "WEEKLY",
+      now: "2026-09-10T01:11:00.000Z",
+      period: digestPeriodFor("WEEKLY", "2026-09-10T01:11:00.000Z"),
+      repository: digestRepository,
+      userId: constructionRegistration.user.id,
+    });
+    const replayedDigest = await buildDigest({
+      correlationId: correlationId("77000000-0000-4000-8000-000000000003"),
+      digestId: digestId("78000000-0000-4000-8000-000000000003"),
+      kind: "DAILY",
+      now: "2026-09-10T01:12:00.000Z",
+      period: digestPeriodFor("DAILY", "2026-09-10T01:12:00.000Z"),
+      repository: digestRepository,
+      userId: constructionRegistration.user.id,
+    });
+    expect(dailyDigest.view.items).toHaveLength(5);
+    expect(
+      dailyDigest.view.items.map((item) => item.opportunity.recommendation.totalScore),
+    ).toEqual(
+      [...dailyDigest.view.items]
+        .map((item) => item.opportunity.recommendation.totalScore)
+        .sort((left, right) => right - left),
+    );
+    expect(replayedDigest).toMatchObject({
+      created: false,
+      view: { digest: { id: dailyDigest.view.digest.id } },
+    });
+    expect(weeklyDigest.view.digest.weeklySummary).toMatchObject({
+      processed: 200,
+      relevant: 110,
+      unique: 150,
+    });
+    expect(weeklyDigest.view.digest.weeklySummary?.opportunities).toBeGreaterThan(0);
+    expect(weeklyDigest.view.digest.weeklySummary?.categoryTrends.length).toBeGreaterThan(0);
+    expect(dailyDigest.view.items.every((item) => item.opportunity.sources.length > 0)).toBe(true);
+    expect(await client.digest.count()).toBe(2);
+    const horecaRegistration = input.profiles[1];
+    if (horecaRegistration === undefined) {
+      throw new Error("HoReCa profile fixture is required");
+    }
+    await expect(
+      client.digest.create({
+        data: {
+          correlationId: "77000000-0000-4000-8000-000000000099",
+          createdAt: new Date("2026-09-11T01:00:00.000Z"),
+          digestVersion: "digest-v1",
+          id: "78000000-0000-4000-8000-000000000099",
+          kind: "DAILY",
+          periodEnd: new Date("2026-09-12T00:00:00.000Z"),
+          periodStart: new Date("2026-09-11T00:00:00.000Z"),
+          userId: horecaRegistration.user.id,
+          userProfileId: constructionRegistration.profile.id,
+          userProfileRevision: constructionRegistration.profile.revision,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2003" });
+
+    const digestDeliveryRepository = new PrismaDigestDeliveryRepository(client);
+    const digestAdapter = new FakeDeliveryAdapter();
+    const digestDeliveryInput = {
+      correlationId: correlationId("77000000-0000-4000-8000-000000000004"),
+      digestDeliveryId: digestDeliveryId("79000000-0000-4000-8000-000000000001"),
+      digestId: digestId("78000000-0000-4000-8000-000000000004"),
+      kind: "DAILY" as const,
+      now: () => "2026-09-10T01:20:00.000Z",
+      port: digestAdapter,
+      repositories: {
+        digestDeliveries: digestDeliveryRepository,
+        digests: digestRepository,
+        users: repositories.profiles,
+      },
+      telegramUserId: constructionRegistration.user.telegramUserId,
+    };
+    const deliveredDigest = await deliverTelegramDigest(digestDeliveryInput);
+    const replayedDigestDelivery = await deliverTelegramDigest({
+      ...digestDeliveryInput,
+      digestDeliveryId: digestDeliveryId("79000000-0000-4000-8000-000000000002"),
+      digestId: digestId("78000000-0000-4000-8000-000000000005"),
+    });
+    expect(deliveredDigest).toMatchObject({ deliveryCreated: true, delivery: { status: "SENT" } });
+    expect(replayedDigestDelivery).toMatchObject({
+      deliveryCreated: false,
+      delivery: { id: deliveredDigest.delivery?.id, status: "SENT" },
+    });
+    expect(digestAdapter.sentDigests).toHaveLength(1);
+    expect(await client.digestDelivery.count()).toBe(1);
 
     const feedbackRepository = new PrismaFeedbackRepository(client);
     const deliveryRepository = new PrismaDeliveryRepository(client);
