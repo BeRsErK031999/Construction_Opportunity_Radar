@@ -20,3 +20,4 @@
   - Users
     - [GET /users/:id/profile](private/v1/users/get-profile.md)
     - [PATCH /users/:id/profile](private/v1/users/patch-profile.md)
+    - [GET /users/:id/feedback-summary](private/v1/users/get-feedback-summary.md)

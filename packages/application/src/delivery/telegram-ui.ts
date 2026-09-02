@@ -21,7 +21,13 @@ import {
   type UserProfileRepository,
 } from "../api/application-api.js";
 
-export const TELEGRAM_FEEDBACK_ACTIONS = ["USEFUL", "NOT_USEFUL", "SAVED"] as const;
+export const TELEGRAM_FEEDBACK_ACTIONS = [
+  "USEFUL",
+  "NOT_USEFUL",
+  "SAVED",
+  "ACTED",
+  "ALREADY_KNOWN",
+] as const;
 export type TelegramFeedbackAction = (typeof TELEGRAM_FEEDBACK_ACTIONS)[number];
 
 export type BotApplicationErrorCode =

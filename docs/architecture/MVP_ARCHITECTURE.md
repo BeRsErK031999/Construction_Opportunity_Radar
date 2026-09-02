@@ -230,7 +230,9 @@ The bot is a delivery interface, not a reader for arbitrary third-party channels
 
 ### Feedback and outcomes
 
-Persist `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, and `ALREADY_KNOWN` with user, recommendation/delivery, timestamp, optional reason, and correlation context. Feedback informs measured rule/prompt changes but never silently changes scoring weights or model behavior.
+Persist `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, and `ALREADY_KNOWN` with user, recommendation/delivery, timestamp, optional reason, and correlation context. One action per user/recommendation is idempotent even when concurrent transport callback IDs differ; `USEFUL` and `NOT_USEFUL` are mutually exclusive.
+
+ART-016 adds a caller-owned read model across direct HTTP and Telegram actions. Feedback coverage is distinct successfully delivered recommendations with any action divided by distinct successfully delivered recommendations; positive sentiment is `USEFUL / (USEFUL + NOT_USEFUL)`. Counts are all-time until a versioned period/cohort contract is justified. `HIGH`/`CRITICAL` recommendations marked `NOT_USEFUL` retain score, headline, reason, attribution, and IDs for review. These metrics inform measured rule/prompt changes but never silently change scoring weights or model behavior.
 
 ### Admin after closed MVP
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   FeedbackWriteConflictError,
+  type FeedbackReadRepository,
   type FeedbackRepository,
   type SignalListFilter,
   type SignalOpportunityRepository,
@@ -13,7 +14,10 @@ import {
   correlationId,
   createUser,
   createUserProfile,
+  deliveryId,
+  feedbackId,
   recommendationId,
+  signalId,
   userId,
   userProfileId,
   type Feedback,
@@ -30,6 +34,7 @@ const PROFILE_ID = "20000000-0000-4000-8000-000000000001";
 const SIGNAL_ID = "30000000-0000-4000-8000-000000000001";
 const RECOMMENDATION_ID = "40000000-0000-4000-8000-000000000001";
 const FEEDBACK_ID = "50000000-0000-4000-8000-000000000001";
+const OUTCOME_FEEDBACK_ID = "50000000-0000-4000-8000-000000000002";
 const SOURCE_ID = "60000000-0000-4000-8000-000000000001";
 const NOW = "2026-09-02T00:00:00.000Z";
 
@@ -64,6 +69,7 @@ const sourceRequest = () => ({
 const repositories = () => {
   const sources = new Map<string, Source>();
   const feedbackById = new Map<string, Feedback>();
+  let latestHighScoreLimit: number | null = null;
   let latestSignalFilter: SignalListFilter | null = null;
   const user = createUser({
     createdAt: NOW,
@@ -144,15 +150,53 @@ const repositories = () => {
       return Promise.resolve({ created: true, feedback });
     },
   };
+  const feedbackReadRepository: FeedbackReadRepository = {
+    summarizeForUser(id, highScoreLimit) {
+      latestHighScoreLimit = highScoreLimit;
+      return Promise.resolve({
+        actionCounts: {
+          ACTED: 1,
+          ALREADY_KNOWN: 1,
+          NOT_USEFUL: 1,
+          SAVED: 2,
+          USEFUL: 3,
+        },
+        deliveredRecommendations: 5,
+        directActions: 2,
+        evaluatedDeliveredRecommendations: 2,
+        highScoreNotUseful: [
+          {
+            attribution: "TELEGRAM",
+            band: "HIGH",
+            correlationId: correlationId("70000000-0000-4000-8000-000000000001"),
+            deliveryId: deliveryId("80000000-0000-4000-8000-000000000001"),
+            feedbackAt: NOW,
+            feedbackId: feedbackId("90000000-0000-4000-8000-000000000001"),
+            headline: "Высокая оценка, но пользователь не увидел пользы",
+            reason: "Потребность уже закрыта",
+            recommendationId: recommendationId(RECOMMENDATION_ID),
+            signalId: signalId(SIGNAL_ID),
+            totalScore: 82,
+            vertical: "CONSTRUCTION",
+          },
+        ],
+        recommendationsWithFeedback: id === user.id ? 4 : 0,
+        telegramActions: 6,
+      });
+    },
+  };
 
   return {
     api: {
       feedback: feedbackRepository,
+      feedbackRead: feedbackReadRepository,
       profiles: profileRepository,
       signals: signalRepository,
       sources: sourceRepository,
     } satisfies ApiRepositories,
     getLatestSignalFilter: () => latestSignalFilter,
+    getFeedback: (id: string) => feedbackById.get(id),
+    getLatestHighScoreLimit: () => latestHighScoreLimit,
     getProfile: () => profile,
     sources,
   };
@@ -293,5 +337,44 @@ describe("private HTTP API v1", () => {
     expect(repeated.statusCode).toBe(200);
     expect(conflict.statusCode).toBe(409);
     expect(conflict.json()).toMatchObject({ error: { code: "CONFLICT" } });
+  });
+
+  it("stores outcome context and returns an authorized feedback read model", async () => {
+    const state = repositories();
+    const app = createTestApi(state.api);
+
+    const acted = await app.inject({
+      headers: { ...authorizedHeaders(), "idempotency-key": OUTCOME_FEEDBACK_ID },
+      method: "POST",
+      payload: { action: "ACTED", reason: "Передали в отдел продаж" },
+      url: `/signals/${SIGNAL_ID}/feedback`,
+    });
+    const summary = await app.inject({
+      headers: authorizedHeaders(),
+      method: "GET",
+      url: `/users/${USER_ID}/feedback-summary?highScoreLimit=7`,
+    });
+    const forbidden = await app.inject({
+      headers: authorizedHeaders(OTHER_USER_ID),
+      method: "GET",
+      url: `/users/${USER_ID}/feedback-summary`,
+    });
+
+    expect(acted.statusCode).toBe(201);
+    expect(state.getFeedback(OUTCOME_FEEDBACK_ID)).toMatchObject({
+      action: "ACTED",
+      reason: "Передали в отдел продаж",
+    });
+    expect(summary.statusCode).toBe(200);
+    expect(summary.json()).toMatchObject({
+      actions: { acted: 1, alreadyKnown: 1, notUseful: 1, saved: 2, useful: 3 },
+      feedbackCoveragePercent: 40,
+      highScoreNotUseful: [{ reason: "Потребность уже закрыта", totalScore: 82 }],
+      positiveSentimentPercent: 75,
+      totals: { actions: 8 },
+      userId: USER_ID,
+    });
+    expect(state.getLatestHighScoreLimit()).toBe(7);
+    expect(forbidden.statusCode).toBe(403);
   });
 });

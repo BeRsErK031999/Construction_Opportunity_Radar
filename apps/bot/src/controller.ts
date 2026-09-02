@@ -60,16 +60,30 @@ export interface BotControllerOptions {
   readonly repositories: TelegramUiRepositories;
 }
 
-const feedbackActions: Readonly<Record<"n" | "s" | "u", TelegramFeedbackAction>> = {
+type FeedbackActionCode = "a" | "k" | "n" | "s" | "u";
+
+const feedbackActions: Readonly<Record<FeedbackActionCode, TelegramFeedbackAction>> = {
+  a: "ACTED",
+  k: "ALREADY_KNOWN",
   n: "NOT_USEFUL",
   s: "SAVED",
   u: "USEFUL",
 };
 
 const feedbackConfirmation: Readonly<Record<TelegramFeedbackAction, string>> = {
+  ACTED: "Отмечено: взяли в работу",
+  ALREADY_KNOWN: "Спасибо, учтём: уже знали",
   NOT_USEFUL: "Спасибо, учтём: не полезно",
   SAVED: "Возможность сохранена",
   USEFUL: "Спасибо за оценку",
+};
+
+const repeatedFeedbackConfirmation: Readonly<Record<TelegramFeedbackAction, string>> = {
+  ACTED: "Уже отмечено: взяли в работу",
+  ALREADY_KNOWN: "Уже отмечено: знали раньше",
+  NOT_USEFUL: "Оценка «не полезно» уже сохранена",
+  SAVED: "Возможность уже сохранена",
+  USEFUL: "Оценка «полезно» уже сохранена",
 };
 
 const expectedErrorMessage = (error: unknown): string | null =>
@@ -222,7 +236,7 @@ export class BotController {
 
   async callback(interaction: BotCallbackInteraction, data: string): Promise<void> {
     const match =
-      /^fb:([nsu]):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.exec(
+      /^fb:([aknsu]):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.exec(
         data,
       );
     if (match === null) {
@@ -233,7 +247,7 @@ export class BotController {
       });
       return;
     }
-    const actionCode = match[1]?.toLowerCase() as "n" | "s" | "u";
+    const actionCode = match[1]?.toLowerCase() as FeedbackActionCode;
     const deliveryIdentifier = match[2];
     if (deliveryIdentifier === undefined) {
       throw new Error("Matched feedback callback has no delivery identifier");
@@ -250,7 +264,7 @@ export class BotController {
       });
       await this.#messenger.answerCallback({
         callbackQueryId: interaction.callbackQueryId,
-        text: result.created ? feedbackConfirmation[action] : "Уже сохранено",
+        text: result.created ? feedbackConfirmation[action] : repeatedFeedbackConfirmation[action],
       });
     } catch (error) {
       const message = expectedErrorMessage(error);

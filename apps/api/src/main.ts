@@ -28,12 +28,14 @@ export const runApi = async (): Promise<void> => {
   });
 
   const client = createDatabaseClient(config.databaseUrl);
+  const feedback = new PrismaFeedbackRepository(client);
   await startApi({
     config,
     logger,
     onClose: () => client.$disconnect(),
     repositories: {
-      feedback: new PrismaFeedbackRepository(client),
+      feedback,
+      feedbackRead: feedback,
       profiles: new PrismaProfileRegistrationRepository(client),
       signals: new PrismaSignalOpportunityRepository(client),
       sources: new PrismaSourceRepository(client),

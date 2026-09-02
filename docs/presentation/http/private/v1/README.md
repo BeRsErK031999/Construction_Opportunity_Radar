@@ -2,7 +2,7 @@
 
 ## Назначение и границы
 
-API вызывают доверенные локальные transport-адаптеры, включая будущий Telegram bot. PostgreSQL остаётся source of truth; HTTP-слой вызывает application use cases и не содержит бизнес-правил.
+API вызывают доверенные локальные transport-адаптеры, включая Telegram bot. PostgreSQL остаётся source of truth; HTTP-слой вызывает application use cases и не содержит бизнес-правил.
 
 ## Общие правила
 
@@ -17,3 +17,5 @@ API вызывают доверенные локальные transport-адап�
 ## Ресурсы
 
 `Signal` — глобальный классифицированный факт, но `/signals` возвращает персональную проекцию `SignalOpportunity`: Signal + успешный Analysis + Recommendation для последней ревизии профиля текущего пользователя + provenance. Поэтому `score` фильтрует Recommendation, а не глобальный Signal. После изменения профиля выдача остаётся пустой до построения Recommendation для новой ревизии; старые персональные оценки не подмешиваются.
+
+`FeedbackSummary` — all-time read model одного caller-а. Он объединяет прямые HTTP-действия и Telegram callback-и, но не раскрывает данные других пользователей и не изменяет scoring.

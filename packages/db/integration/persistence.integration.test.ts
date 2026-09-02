@@ -8,6 +8,7 @@ import {
   executeDeduplication,
   executeNormalization,
   deliverTelegramOpportunities,
+  getUserFeedbackSummary,
   ingestSource,
   listSignalOpportunities,
   patchUserProfile,
@@ -717,8 +718,9 @@ describe("PostgreSQL persistence", () => {
       repository: opportunityRepository,
     });
     const firstOpportunity = opportunities.items[0];
-    if (firstOpportunity === undefined) {
-      throw new Error("At least one persisted opportunity is required");
+    const secondOpportunity = opportunities.items[1];
+    if (firstOpportunity === undefined || secondOpportunity === undefined) {
+      throw new Error("At least two persisted opportunities are required");
     }
     expect(opportunities.items).toHaveLength(2);
     expect(opportunities.items.every((item) => item.analysis.facts.length > 0)).toBe(true);
@@ -783,20 +785,59 @@ describe("PostgreSQL persistence", () => {
     expect(racedOutcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
     expect(racedOutcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
     expect((await deliveryRepository.findById(pendingRace.id))?.status).toMatch(/^(FAILED|SENT)$/);
+    await expect(
+      client.feedback.create({
+        data: {
+          action: "SAVED",
+          correlationId: firstOpportunity.recommendation.correlationId,
+          createdAt: new Date("2026-09-10T01:30:15.000Z"),
+          deliveryId: deliveryId("74000000-0000-4000-8000-000000000001"),
+          id: feedbackId("76000000-0000-4000-8000-000000000001"),
+          recommendationId: secondOpportunity.recommendation.id,
+          userId: constructionRegistration.user.id,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2003" });
 
-    const savedFeedback = await submitTelegramDeliveryFeedback({
-      action: "SAVED",
-      deliveryId: deliveryId("74000000-0000-4000-8000-000000000001"),
-      feedbackId: feedbackId("75000000-0000-4000-8000-000000000001"),
-      now: "2026-09-10T01:31:00.000Z",
-      repositories: {
-        deliveries: deliveryRepository,
-        feedback: feedbackRepository,
-        users: repositories.profiles,
-      },
-      telegramUserId: constructionRegistration.user.telegramUserId,
+    const directNotUseful = await submitSignalFeedback({
+      action: "NOT_USEFUL",
+      callerUserId: constructionRegistration.user.id,
+      feedbackId: feedbackId("73000000-0000-4000-8000-000000000001"),
+      now: "2026-09-10T01:30:30.000Z",
+      reason: "Потребность уже закрыта",
+      repository: feedbackRepository,
+      signalId: firstOpportunity.signal.id,
     });
-    expect(savedFeedback).toMatchObject({ created: true, feedback: { action: "SAVED" } });
+    expect(directNotUseful.feedback.reason).toBe("Потребность уже закрыта");
+
+    const telegramFeedback = (action: "ACTED" | "ALREADY_KNOWN" | "SAVED", id: string) =>
+      submitTelegramDeliveryFeedback({
+        action,
+        deliveryId: deliveryId("74000000-0000-4000-8000-000000000001"),
+        feedbackId: feedbackId(id),
+        now: "2026-09-10T01:31:00.000Z",
+        repositories: {
+          deliveries: deliveryRepository,
+          feedback: feedbackRepository,
+          users: repositories.profiles,
+        },
+        telegramUserId: constructionRegistration.user.telegramUserId,
+      });
+    const savedFeedback = await telegramFeedback("SAVED", "75000000-0000-4000-8000-000000000001");
+    const actedRace = await Promise.all([
+      telegramFeedback("ACTED", "75000000-0000-4000-8000-000000000002"),
+      telegramFeedback("ACTED", "75000000-0000-4000-8000-000000000003"),
+    ]);
+    const alreadyKnownFeedback = await telegramFeedback(
+      "ALREADY_KNOWN",
+      "75000000-0000-4000-8000-000000000004",
+    );
+    expect([
+      savedFeedback.feedback.action,
+      ...actedRace.map((outcome) => outcome.feedback.action),
+      alreadyKnownFeedback.feedback.action,
+    ]).toEqual(["SAVED", "ACTED", "ACTED", "ALREADY_KNOWN"]);
+    expect(actedRace.map((outcome) => outcome.created).sort()).toEqual([false, true]);
     expect(
       await opportunityRepository.listSavedForUser(constructionRegistration.user.id, 5),
     ).toHaveLength(1);
@@ -828,9 +869,10 @@ describe("PostgreSQL persistence", () => {
     const feedbackInput = {
       action: "USEFUL" as const,
       callerUserId: constructionRegistration.user.id,
-      feedbackId: feedbackId("73000000-0000-4000-8000-000000000001"),
+      feedbackId: feedbackId("73000000-0000-4000-8000-000000000002"),
+      reason: "Передали менеджеру по продажам",
       repository: feedbackRepository,
-      signalId: firstOpportunity.signal.id,
+      signalId: secondOpportunity.signal.id,
     };
     const feedbackCreated = await submitSignalFeedback({
       ...feedbackInput,
@@ -842,15 +884,47 @@ describe("PostgreSQL persistence", () => {
     });
     expect(feedbackCreated.created).toBe(true);
     expect(feedbackRepeated.created).toBe(false);
-    expect(await client.feedback.count()).toBe(2);
+    expect(await client.feedback.count()).toBe(5);
+    const feedbackSummary = await getUserFeedbackSummary({
+      callerUserId: constructionRegistration.user.id,
+      generatedAt: "2026-09-10T02:02:30.000Z",
+      highScoreLimit: 5,
+      repository: feedbackRepository,
+      userId: constructionRegistration.user.id,
+    });
+    expect(feedbackSummary).toMatchObject({
+      actions: {
+        ACTED: 1,
+        ALREADY_KNOWN: 1,
+        NOT_USEFUL: 1,
+        SAVED: 1,
+        USEFUL: 1,
+      },
+      attribution: { direct: 2, telegram: 3 },
+      feedbackCoveragePercent: 100,
+      positiveSentimentPercent: 50,
+      totals: {
+        actions: 5,
+        deliveredRecommendations: 1,
+        evaluatedDeliveredRecommendations: 1,
+        recommendationsWithFeedback: 2,
+      },
+    });
+    expect(feedbackSummary.highScoreNotUseful).toMatchObject([
+      {
+        attribution: "DIRECT",
+        reason: "Потребность уже закрыта",
+        recommendationId: firstOpportunity.recommendation.id,
+      },
+    ]);
     await expect(
       submitSignalFeedback({
         action: "NOT_USEFUL",
         callerUserId: constructionRegistration.user.id,
-        feedbackId: feedbackId("73000000-0000-4000-8000-000000000002"),
+        feedbackId: feedbackId("73000000-0000-4000-8000-000000000003"),
         now: "2026-09-10T02:03:00.000Z",
         repository: feedbackRepository,
-        signalId: firstOpportunity.signal.id,
+        signalId: secondOpportunity.signal.id,
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });

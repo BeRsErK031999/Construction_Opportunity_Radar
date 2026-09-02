@@ -3,6 +3,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   ApplicationApiError,
   createSourceEntry,
+  getUserFeedbackSummary,
   getSignalOpportunity,
   getUserProfile,
   listSignalOpportunities,
@@ -11,6 +12,8 @@ import {
   patchUserProfile,
   submitSignalFeedback,
   type FeedbackRepository,
+  type FeedbackReadRepository,
+  type FeedbackSummary,
   type SignalOpportunity,
   type SignalOpportunityRepository,
   type SourceRegistryRepository,
@@ -21,6 +24,8 @@ import {
   ApiErrorV1Schema,
   CreatedResourceV1Schema,
   FeedbackCreateRequestV1Schema,
+  FeedbackSummaryQueryV1Schema,
+  FeedbackSummaryV1Schema,
   HealthResponseSchema,
   SignalListQueryV1Schema,
   SignalListResponseV1Schema,
@@ -52,6 +57,7 @@ export const API_VERSION = "0.1.0";
 
 export interface ApiRepositories {
   readonly feedback: FeedbackRepository;
+  readonly feedbackRead: FeedbackReadRepository;
   readonly profiles: UserProfileRepository;
   readonly signals: SignalOpportunityRepository;
   readonly sources: SourceRegistryRepository;
@@ -142,6 +148,24 @@ const requireRepositories = (repositories: ApiRepositories | null): ApiRepositor
 const sourceResponse = (source: Source) => SourceV1Schema.parse(source);
 
 const profileResponse = (profile: UserProfile) => UserProfileV1Schema.parse(profile);
+
+const feedbackSummaryResponse = (summary: FeedbackSummary) =>
+  FeedbackSummaryV1Schema.parse({
+    actions: {
+      acted: summary.actions.ACTED,
+      alreadyKnown: summary.actions.ALREADY_KNOWN,
+      notUseful: summary.actions.NOT_USEFUL,
+      saved: summary.actions.SAVED,
+      useful: summary.actions.USEFUL,
+    },
+    attribution: summary.attribution,
+    feedbackCoveragePercent: summary.feedbackCoveragePercent,
+    generatedAt: summary.generatedAt,
+    highScoreNotUseful: summary.highScoreNotUseful,
+    positiveSentimentPercent: summary.positiveSentimentPercent,
+    totals: summary.totals,
+    userId: summary.userId,
+  });
 
 const opportunityResponse = (opportunity: SignalOpportunity) =>
   SignalOpportunityV1Schema.parse({
@@ -397,6 +421,21 @@ export const buildApi = (options: BuildApiOptions) => {
       userId: userId(path.id),
     });
     return reply.code(204).send();
+  });
+
+  app.get("/users/:id/feedback-summary", async (request) => {
+    authenticate(request, configuredToken);
+    const path = z.strictObject({ id: z.uuid() }).parse(request.params);
+    const query = FeedbackSummaryQueryV1Schema.parse(request.query);
+    return feedbackSummaryResponse(
+      await getUserFeedbackSummary({
+        callerUserId: callerUserId(request),
+        generatedAt: now().toISOString(),
+        highScoreLimit: query.highScoreLimit,
+        repository: requireRepositories(repositories).feedbackRead,
+        userId: userId(path.id),
+      }),
+    );
   });
 
   app.post("/signals/:id/feedback", async (request, reply) => {

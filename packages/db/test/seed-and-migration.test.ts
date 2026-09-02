@@ -20,6 +20,10 @@ const deliveryMigrationPath = new URL(
   "../prisma/migrations/20260902150000_add_telegram_deliveries/migration.sql",
   import.meta.url,
 );
+const feedbackContextMigrationPath = new URL(
+  "../prisma/migrations/20260902170000_enforce_feedback_delivery_context/migration.sql",
+  import.meta.url,
+);
 
 describe("development seed contract", () => {
   it("contains ten sources and one hundred uniquely attributable raw items", () => {
@@ -85,5 +89,13 @@ describe("initial migration contract", () => {
     expect(migration).toContain('"deliveries_channel_idempotency_key"');
     expect(migration).toContain('"deliveries_channel_user_provider_message_key"');
     expect(migration).toContain('CONSTRAINT "feedback_delivery_id_fkey"');
+  });
+
+  it("binds feedback delivery to the same user and recommendation", async () => {
+    const migration = await readFile(feedbackContextMigrationPath, "utf8");
+
+    expect(migration).toContain('"deliveries_feedback_context_key"');
+    expect(migration).toContain('CONSTRAINT "feedback_delivery_context_fkey"');
+    expect(migration).toContain('FOREIGN KEY ("delivery_id", "user_id", "recommendation_id")');
   });
 });

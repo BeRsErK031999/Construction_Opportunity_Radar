@@ -69,7 +69,8 @@ describe("delivery adapters", () => {
         { ...firstAction, priority: 4, title: "Лишнее четвёртое действие" },
       ],
     });
-    const callback = feedbackCallbackData("u", card().deliveryId);
+    const actionCodes = ["a", "k", "n", "s", "u"] as const;
+    const callbacks = actionCodes.map((action) => feedbackCallbackData(action, card().deliveryId));
 
     expect(text).toContain("Возможность: 84/100");
     expect(text).toContain("Новый объект &lt;важный&gt;");
@@ -77,9 +78,11 @@ describe("delivery adapters", () => {
     expect(text).toContain("Третье действие");
     expect(text).not.toContain("Лишнее четвёртое действие");
     expect(text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_LIMIT);
-    expect(Buffer.byteLength(callback, "utf8")).toBeLessThanOrEqual(
-      TELEGRAM_CALLBACK_DATA_LIMIT_BYTES,
-    );
+    expect(
+      callbacks.every(
+        (callback) => Buffer.byteLength(callback, "utf8") <= TELEGRAM_CALLBACK_DATA_LIMIT_BYTES,
+      ),
+    ).toBe(true);
   });
 
   it("maps the semantic card to one Telegram sendMessage call", async () => {
@@ -98,6 +101,8 @@ describe("delivery adapters", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ chatId: "123", options: { parse_mode: "HTML" } });
     expect(JSON.stringify(sent[0])).toContain("👍 Полезно");
+    expect(JSON.stringify(sent[0])).toContain("✅ Взяли в работу");
+    expect(JSON.stringify(sent[0])).toContain("🙈 Уже знали");
     expect(JSON.stringify(sent[0])).toContain("https://example.test/item?a=1&b=2");
   });
 });

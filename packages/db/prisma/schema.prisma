@@ -413,6 +413,7 @@ model Delivery {
   recommendation    Recommendation  @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
   feedback          Feedback[]
 
+  @@unique([id, userId, recommendationId], map: "deliveries_feedback_context_key")
   @@unique([channel, idempotencyKey], map: "deliveries_channel_idempotency_key")
   @@unique([channel, userId, providerMessageId], map: "deliveries_channel_user_provider_message_key")
   @@index([userId, status, createdAt], map: "deliveries_user_status_created_idx")
@@ -442,7 +443,7 @@ model Feedback {
   createdAt        DateTime       @map("created_at") @db.Timestamptz(3)
   user             User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
-  delivery         Delivery?      @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  delivery         Delivery?      @relation(fields: [deliveryId, userId, recommendationId], references: [id, userId, recommendationId], onDelete: Restrict)
 
   @@unique([userId, recommendationId, action], map: "feedback_identity_key")
   @@index([createdAt], map: "feedback_created_idx")

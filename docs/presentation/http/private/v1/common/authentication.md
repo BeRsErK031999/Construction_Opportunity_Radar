@@ -13,8 +13,9 @@ Token — технический секрет между локальными п
 - `GET /signals`;
 - `GET /signals/:id`;
 - `GET|PATCH /users/:id/profile`;
+- `GET /users/:id/feedback-summary`;
 - `POST /signals/:id/feedback`.
 
-Для профиля caller ID обязан совпадать с `:id`; иначе возвращается `403 FORBIDDEN`. Возможности и feedback всегда выбираются через Recommendation, принадлежащую профилю caller-а. Telegram identity и персональные данные наружу не возвращаются.
+Для профиля и feedback summary caller ID обязан совпадать с `:id`; иначе возвращается `403 FORBIDDEN`. Возможности и feedback всегда выбираются через Recommendation, принадлежащую профилю caller-а. Telegram identity и персональные данные наружу не возвращаются.
 
 В MVP заголовок устанавливает доверенный локальный transport-адаптер. До публичного bind необходима отдельная пользовательская authentication scheme из ART-022.

@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { type TelegramUiRepositories } from "@radar/application";
-import { createUser, createUserProfile, userId, userProfileId } from "@radar/core";
+import {
+  correlationId,
+  createPendingDelivery,
+  createUser,
+  createUserProfile,
+  deliveryId,
+  markDeliverySent,
+  recommendationId,
+  userId,
+  userProfileId,
+  type FeedbackAction,
+} from "@radar/core";
 import { FakeDeliveryAdapter } from "@radar/delivery-adapters";
 
 import {
@@ -170,6 +181,69 @@ describe("Telegram bot controller", () => {
         showAlert: true,
         text: "Кнопка устарела. Откройте карточку заново.",
       },
+    ]);
+  });
+
+  it("maps the acted and already-known callbacks to attributable feedback", async () => {
+    const state = dependencies();
+    const savedActions: FeedbackAction[] = [];
+    const sentDelivery = markDeliverySent(
+      createPendingDelivery({
+        channel: "TELEGRAM",
+        correlationId: correlationId("70000000-0000-4000-8000-000000000001"),
+        createdAt: NOW,
+        id: deliveryId("30000000-0000-4000-8000-000000000001"),
+        idempotencyKey: "controller-feedback",
+        kind: "OPPORTUNITY",
+        recommendationId: recommendationId("40000000-0000-4000-8000-000000000001"),
+        userId: USER_ID,
+      }),
+      "message-1",
+      NOW,
+    );
+    state.controller = new BotController({
+      deliveryPort: new FakeDeliveryAdapter(),
+      messenger: {
+        answerCallback(input) {
+          state.answers.push(input);
+          return Promise.resolve();
+        },
+        sendText() {
+          return Promise.resolve();
+        },
+      },
+      now: () => NOW,
+      repositories: {
+        ...state.repositories,
+        deliveries: {
+          ...state.repositories.deliveries,
+          findById() {
+            return Promise.resolve(sentDelivery);
+          },
+        },
+        feedback: {
+          ...state.repositories.feedback,
+          save(feedback) {
+            savedActions.push(feedback.action);
+            return Promise.resolve({ created: true, feedback });
+          },
+        },
+      },
+    });
+
+    await state.controller.callback(
+      { ...interaction, callbackQueryId: "callback-acted" },
+      `fb:a:${sentDelivery.id}`,
+    );
+    await state.controller.callback(
+      { ...interaction, callbackQueryId: "callback-known" },
+      `fb:k:${sentDelivery.id}`,
+    );
+
+    expect(savedActions).toEqual(["ACTED", "ALREADY_KNOWN"]);
+    expect(state.answers.map((answer) => answer.text)).toEqual([
+      "Отмечено: взяли в работу",
+      "Спасибо, учтём: уже знали",
     ]);
   });
 

@@ -241,3 +241,105 @@ export const FeedbackCreateRequestV1Schema = z.strictObject({
   reason: NullableText(2_000).optional(),
 });
 export type FeedbackCreateRequestV1 = z.infer<typeof FeedbackCreateRequestV1Schema>;
+
+export const FeedbackSummaryQueryV1Schema = z.strictObject({
+  highScoreLimit: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type FeedbackSummaryQueryV1 = z.infer<typeof FeedbackSummaryQueryV1Schema>;
+
+const HighScoreNotUsefulFeedbackV1Schema = z
+  .strictObject({
+    attribution: z.enum(["DIRECT", "TELEGRAM"]),
+    band: z.enum(["HIGH", "CRITICAL"]),
+    correlationId: IdentifierSchema,
+    deliveryId: IdentifierSchema.nullable(),
+    feedbackAt: TimestampSchema,
+    feedbackId: IdentifierSchema,
+    headline: z.string().trim().min(1).max(500),
+    reason: NullableText(2_000),
+    recommendationId: IdentifierSchema,
+    signalId: IdentifierSchema,
+    totalScore: z.number().min(0).max(100),
+    vertical: z.enum(VERTICALS),
+  })
+  .refine(
+    (value) =>
+      (value.attribution === "DIRECT" && value.deliveryId === null) ||
+      (value.attribution === "TELEGRAM" && value.deliveryId !== null),
+    { message: "Attribution must match deliveryId", path: ["deliveryId"] },
+  );
+
+const roundedPercent = (numerator: number, denominator: number): number =>
+  denominator === 0 ? 0 : Math.round((numerator / denominator) * 10_000) / 100;
+
+export const FeedbackSummaryV1Schema = z
+  .strictObject({
+    actions: z.strictObject({
+      acted: z.number().int().nonnegative(),
+      alreadyKnown: z.number().int().nonnegative(),
+      notUseful: z.number().int().nonnegative(),
+      saved: z.number().int().nonnegative(),
+      useful: z.number().int().nonnegative(),
+    }),
+    attribution: z.strictObject({
+      direct: z.number().int().nonnegative(),
+      telegram: z.number().int().nonnegative(),
+    }),
+    feedbackCoveragePercent: z.number().min(0).max(100),
+    generatedAt: TimestampSchema,
+    highScoreNotUseful: z.array(HighScoreNotUsefulFeedbackV1Schema).max(100),
+    positiveSentimentPercent: z.number().min(0).max(100).nullable(),
+    totals: z.strictObject({
+      actions: z.number().int().nonnegative(),
+      deliveredRecommendations: z.number().int().nonnegative(),
+      evaluatedDeliveredRecommendations: z.number().int().nonnegative(),
+      recommendationsWithFeedback: z.number().int().nonnegative(),
+    }),
+    userId: IdentifierSchema,
+  })
+  .superRefine((value, context) => {
+    const actionTotal = Object.values(value.actions).reduce((total, count) => total + count, 0);
+    if (value.totals.actions !== actionTotal) {
+      context.addIssue({
+        code: "custom",
+        message: "Action total must equal the sum of action counts",
+        path: ["totals", "actions"],
+      });
+    }
+    if (value.attribution.direct + value.attribution.telegram !== value.totals.actions) {
+      context.addIssue({
+        code: "custom",
+        message: "Attribution counts must equal the action total",
+        path: ["attribution"],
+      });
+    }
+    if (value.totals.evaluatedDeliveredRecommendations > value.totals.deliveredRecommendations) {
+      context.addIssue({
+        code: "custom",
+        message: "Evaluated deliveries cannot exceed delivered recommendations",
+        path: ["totals", "evaluatedDeliveredRecommendations"],
+      });
+    }
+    const expectedCoverage = roundedPercent(
+      value.totals.evaluatedDeliveredRecommendations,
+      value.totals.deliveredRecommendations,
+    );
+    if (value.feedbackCoveragePercent !== expectedCoverage) {
+      context.addIssue({
+        code: "custom",
+        message: "Coverage must match evaluated and delivered recommendation totals",
+        path: ["feedbackCoveragePercent"],
+      });
+    }
+    const sentimentTotal = value.actions.useful + value.actions.notUseful;
+    const expectedSentiment =
+      sentimentTotal === 0 ? null : roundedPercent(value.actions.useful, sentimentTotal);
+    if (value.positiveSentimentPercent !== expectedSentiment) {
+      context.addIssue({
+        code: "custom",
+        message: "Positive sentiment must match useful and not-useful counts",
+        path: ["positiveSentimentPercent"],
+      });
+    }
+  });
+export type FeedbackSummaryV1 = z.infer<typeof FeedbackSummaryV1Schema>;

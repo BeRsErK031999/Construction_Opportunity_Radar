@@ -71,8 +71,10 @@ const verticalName = (vertical: OpportunityCardDelivery["card"]["vertical"]): st
   return "Другое";
 };
 
-export const feedbackCallbackData = (action: "n" | "s" | "u", deliveryId: string): string =>
-  `fb:${action}:${deliveryId}`;
+export const feedbackCallbackData = (
+  action: "a" | "k" | "n" | "s" | "u",
+  deliveryId: string,
+): string => `fb:${action}:${deliveryId}`;
 
 export const telegramOpportunityKeyboard = (
   deliveryId: string,
@@ -84,6 +86,10 @@ export const telegramOpportunityKeyboard = (
       { callback_data: feedbackCallbackData("n", deliveryId), text: "👎 Не полезно" },
     ],
     [{ callback_data: feedbackCallbackData("s", deliveryId), text: "⭐ Сохранить" }],
+    [
+      { callback_data: feedbackCallbackData("a", deliveryId), text: "✅ Взяли в работу" },
+      { callback_data: feedbackCallbackData("k", deliveryId), text: "🙈 Уже знали" },
+    ],
     [{ text: "🔗 Открыть источник", url: sourceUrl }],
   ],
 });

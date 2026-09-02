@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   FeedbackCreateRequestV1Schema,
+  FeedbackSummaryQueryV1Schema,
+  FeedbackSummaryV1Schema,
   SignalListQueryV1Schema,
   SourceCreateRequestV1Schema,
   SourceListQueryV1Schema,
@@ -57,9 +59,39 @@ describe("HTTP API contract v1", () => {
   });
 
   it("accepts only versioned feedback actions and bounded reasons", () => {
-    expect(FeedbackCreateRequestV1Schema.parse({ action: "USEFUL" })).toEqual({
-      action: "USEFUL",
-    });
+    for (const action of ["USEFUL", "NOT_USEFUL", "SAVED", "ACTED", "ALREADY_KNOWN"]) {
+      expect(
+        FeedbackCreateRequestV1Schema.parse({ action, reason: "Контекст пользователя" }),
+      ).toEqual({
+        action,
+        reason: "Контекст пользователя",
+      });
+    }
     expect(() => FeedbackCreateRequestV1Schema.parse({ action: "LIKE" })).toThrow();
+    expect(() =>
+      FeedbackCreateRequestV1Schema.parse({ action: "NOT_USEFUL", reason: "x".repeat(2_001) }),
+    ).toThrow();
+  });
+
+  it("validates bounded feedback summary queries and metric relationships", () => {
+    expect(FeedbackSummaryQueryV1Schema.parse({})).toEqual({ highScoreLimit: 20 });
+    expect(() => FeedbackSummaryQueryV1Schema.parse({ highScoreLimit: 101 })).toThrow();
+    expect(
+      FeedbackSummaryV1Schema.parse({
+        actions: { acted: 1, alreadyKnown: 0, notUseful: 1, saved: 1, useful: 3 },
+        attribution: { direct: 2, telegram: 4 },
+        feedbackCoveragePercent: 40,
+        generatedAt: "2026-09-02T12:00:00.000Z",
+        highScoreNotUseful: [],
+        positiveSentimentPercent: 75,
+        totals: {
+          actions: 6,
+          deliveredRecommendations: 5,
+          evaluatedDeliveredRecommendations: 2,
+          recommendationsWithFeedback: 4,
+        },
+        userId: "10000000-0000-4000-8000-000000000001",
+      }),
+    ).toMatchObject({ feedbackCoveragePercent: 40, positiveSentimentPercent: 75 });
   });
 });
