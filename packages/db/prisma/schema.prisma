@@ -101,6 +101,20 @@ enum FeedbackAction {
   ALREADY_KNOWN
 }
 
+enum DeliveryChannel {
+  TELEGRAM
+}
+
+enum DeliveryKind {
+  OPPORTUNITY
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 model Source {
   id                    String                 @id @db.Uuid
   name                  String                 @db.VarChar(300)
@@ -319,6 +333,7 @@ model User {
   updatedAt      DateTime                 @map("updated_at") @db.Timestamptz(3)
   profiles       CompanyProfileRevision[]
   feedback       Feedback[]
+  deliveries     Delivery[]
 
   @@map("users")
 }
@@ -373,10 +388,36 @@ model Recommendation {
   userProfile         CompanyProfileRevision @relation(fields: [userProfileId, userProfileRevision], references: [id, revision], onDelete: Restrict)
   sources             RecommendationSource[]
   feedback            Feedback[]
+  deliveries          Delivery[]
 
   @@unique([signalId, analysisId, userProfileId, userProfileRevision, scoringVersion], map: "recommendations_identity_key")
   @@index([userProfileId, userProfileRevision, band, totalScore], map: "recommendations_profile_score_idx")
   @@map("recommendations")
+}
+
+model Delivery {
+  id                String          @id @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  recommendationId  String          @map("recommendation_id") @db.Uuid
+  channel           DeliveryChannel
+  kind              DeliveryKind
+  idempotencyKey    String          @map("idempotency_key") @db.VarChar(200)
+  status            DeliveryStatus
+  providerMessageId String?         @map("provider_message_id") @db.VarChar(200)
+  failureCode       String?         @map("failure_code") @db.VarChar(100)
+  failureReason     String?         @map("failure_reason") @db.Text
+  correlationId     String          @map("correlation_id") @db.Uuid
+  createdAt         DateTime        @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @map("updated_at") @db.Timestamptz(3)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  recommendation    Recommendation  @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+  feedback          Feedback[]
+
+  @@unique([channel, idempotencyKey], map: "deliveries_channel_idempotency_key")
+  @@unique([channel, userId, providerMessageId], map: "deliveries_channel_user_provider_message_key")
+  @@index([userId, status, createdAt], map: "deliveries_user_status_created_idx")
+  @@index([recommendationId], map: "deliveries_recommendation_idx")
+  @@map("deliveries")
 }
 
 model RecommendationSource {
@@ -401,6 +442,7 @@ model Feedback {
   createdAt        DateTime       @map("created_at") @db.Timestamptz(3)
   user             User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+  delivery         Delivery?      @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
 
   @@unique([userId, recommendationId, action], map: "feedback_identity_key")
   @@index([createdAt], map: "feedback_created_idx")

@@ -1,5 +1,6 @@
 import {
   type Page,
+  type SavedOpportunityRepository,
   type SignalListFilter,
   type SignalOpportunity,
   type SignalOpportunityRepository,
@@ -68,7 +69,9 @@ const signalWhere = (filter: SignalListFilter): Prisma.SignalWhereInput => ({
   ...(filter.vertical === undefined ? {} : { vertical: filter.vertical }),
 });
 
-export class PrismaSignalOpportunityRepository implements SignalOpportunityRepository {
+export class PrismaSignalOpportunityRepository
+  implements SavedOpportunityRepository, SignalOpportunityRepository
+{
   readonly #client: DatabaseClient;
 
   constructor(client: DatabaseClient) {
@@ -125,5 +128,18 @@ export class PrismaSignalOpportunityRepository implements SignalOpportunityRepos
       items: Object.freeze(selected.map(fromRecord)),
       nextCursor: hasNextPage ? (selected.at(-1)?.id ?? null) : null,
     });
+  }
+
+  async listSavedForUser(userId: UserId, limit: number): Promise<readonly SignalOpportunity[]> {
+    const records = await this.#client.recommendation.findMany({
+      include: opportunityInclude,
+      orderBy: [{ totalScore: "desc" }, { createdAt: "desc" }, { id: "asc" }],
+      take: limit,
+      where: {
+        feedback: { some: { action: "SAVED", userId } },
+        userProfile: { userId },
+      },
+    });
+    return Object.freeze(records.map(fromRecord));
   }
 }

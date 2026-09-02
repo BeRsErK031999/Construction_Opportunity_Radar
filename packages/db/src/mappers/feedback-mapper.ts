@@ -14,7 +14,7 @@ export const feedbackToCreateData = (feedback: Feedback): Prisma.FeedbackCreateI
   action: feedback.action,
   correlationId: feedback.correlationId,
   createdAt: new Date(feedback.createdAt),
-  deliveryId: feedback.deliveryId,
+  ...(feedback.deliveryId === null ? {} : { delivery: { connect: { id: feedback.deliveryId } } }),
   id: feedback.id,
   reason: feedback.reason,
   recommendation: { connect: { id: feedback.recommendationId } },

@@ -16,6 +16,10 @@ const deduplicationMigrationPath = new URL(
   "../prisma/migrations/20260902110000_add_deduplication_assignments/migration.sql",
   import.meta.url,
 );
+const deliveryMigrationPath = new URL(
+  "../prisma/migrations/20260902150000_add_telegram_deliveries/migration.sql",
+  import.meta.url,
+);
 
 describe("development seed contract", () => {
   it("contains ten sources and one hundred uniquely attributable raw items", () => {
@@ -70,5 +74,16 @@ describe("initial migration contract", () => {
     expect(migration).toContain('CONSTRAINT "deduplication_assignments_metrics_check"');
     expect(migration).toContain('CONSTRAINT "deduplication_assignments_representative_check"');
     expect(migration).toContain('"deduplication_assignments_cluster_idx"');
+  });
+
+  it("persists idempotent Telegram outcomes and links feedback to delivery", async () => {
+    const migration = await readFile(deliveryMigrationPath, "utf8");
+
+    expect(migration).toContain('CREATE TABLE "deliveries"');
+    expect(migration).toContain('CONSTRAINT "deliveries_status_outcome_check"');
+    expect(migration).toContain('CONSTRAINT "deliveries_time_order_check"');
+    expect(migration).toContain('"deliveries_channel_idempotency_key"');
+    expect(migration).toContain('"deliveries_channel_user_provider_message_key"');
+    expect(migration).toContain('CONSTRAINT "feedback_delivery_id_fkey"');
   });
 });

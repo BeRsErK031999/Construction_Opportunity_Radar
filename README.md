@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-014` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, сохранённые Recommendation и private Fastify API v1. API предоставляет permission-safe Source Registry, персональные SignalOpportunity, append-only профиль и идемпотентный feedback. Следующий critical-path пункт — `ART-015 Telegram UI`.
+`ART-004`–`ART-015` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1 и Telegram UI. grammY-бот выдаёт персональные карточки через persisted/idempotent Delivery и принимает `USEFUL`, `NOT_USEFUL`, `SAVED`; adapters проверяются без реального токена. Следующий critical-path пункт — `ART-016 Feedback loop`.
 
 Первый продуктовый контур:
 
@@ -30,8 +30,9 @@
 11. [docs/runbooks/FAKE_AI_PROVIDER.md](docs/runbooks/FAKE_AI_PROVIDER.md) — provider-neutral AI contract, permission boundary, fake-режимы и failure taxonomy.
 12. [docs/runbooks/STRUCTURED_AI_CONTRACT.md](docs/runbooks/STRUCTURED_AI_CONTRACT.md) — `ai-analysis/v1`, relational validation, identity/provenance checks и invalid-response outcome.
 13. [docs/presentation/http/README.md](docs/presentation/http/README.md) — private HTTP API v1, endpoints, поля, auth, ошибки и pagination.
-14. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-15. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+14. [docs/runbooks/TELEGRAM_UI.md](docs/runbooks/TELEGRAM_UI.md) — меню, карточка, delivery state, offline-проверка и условия live smoke.
+15. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+16. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -87,6 +88,17 @@ pnpm process:fixtures
 
 Первые четыре команды позволяют запускать стадии отдельно. `process:fixtures` выполняет весь контур одной командой. На проверенном корпусе результат стабилен: 200 raw, 200 normalized, 150 кластеров, 110 разрешённых signals, 110 успешных fake analyses и 110 рекомендаций для двух fixture-профилей. Повторный полный запуск создаёт 0 строк и делает 0 provider calls. Подробности — в [runbook полного офлайн-конвейера](docs/runbooks/FULL_OFFLINE_PIPELINE.md).
 
+## Telegram UI
+
+Бот запускается отдельным процессом и требует мигрированную PostgreSQL, заранее зарегистрированный Telegram user ID и локальный `TELEGRAM_BOT_TOKEN`:
+
+```powershell
+pnpm process:fixtures
+pnpm bot:dev
+```
+
+Токен нельзя добавлять в Git или командную строку; сохраните его только в ignored `.env`. Автоматический дайджест и изменение профиля в Telegram пока не включены. Полная подготовка и безопасный live smoke описаны в [Telegram runbook](docs/runbooks/TELEGRAM_UI.md).
+
 ## Проверки
 
 ```powershell
@@ -101,7 +113,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-015`: Telegram transport/UI с меню возможностей, дайджеста, сохранённых, интересов и помощи; карточка должна показывать score, объяснение, конкретные действия и source link, а adapter — тестироваться без реального bot token.
+Реализовать `ART-016`: завершить feedback/outcome loop для `ACTED` и `ALREADY_KNOWN`, reason/context и повторных взаимодействий, сохранив полную цепочку user → recommendation → delivery → feedback.
 
 ## Источники планирования
 

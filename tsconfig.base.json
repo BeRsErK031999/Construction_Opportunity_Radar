@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -26,6 +26,7 @@
       "@radar/contracts": ["packages/contracts/src/index.ts"],
       "@radar/core": ["packages/core/src/index.ts"],
       "@radar/db": ["packages/db/src/index.ts"],
+      "@radar/delivery-adapters": ["packages/adapters/delivery/src/index.ts"],
       "@radar/observability": ["packages/observability/src/index.ts"],
       "@radar/source-adapters": ["packages/adapters/sources/src/index.ts"]
     }

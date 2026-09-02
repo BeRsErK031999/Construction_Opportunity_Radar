@@ -13,6 +13,8 @@
     "postinstall": "pnpm --filter @radar/db db:generate",
     "dev": "tsx --tsconfig tsconfig.typecheck.json --env-file-if-exists=.env --watch apps/api/src/main.ts",
     "start": "node --env-file-if-exists=.env apps/api/dist/main.js",
+    "bot:dev": "tsx --tsconfig tsconfig.typecheck.json --env-file-if-exists=.env --watch apps/bot/src/main.ts",
+    "bot:start": "node --env-file-if-exists=.env apps/bot/dist/main.js",
     "db:up": "docker compose -f infra/docker/docker-compose.yml up -d --wait postgres",
     "db:down": "docker compose -f infra/docker/docker-compose.yml down",
     "db:generate": "pnpm --filter @radar/db db:generate",

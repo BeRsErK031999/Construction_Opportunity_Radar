@@ -1,6 +1,7 @@
 import {
   type ProfileRegistrationRepository,
   type ProfileRegistrationSaveResult,
+  type TelegramUserRepository,
   type UserProfileRepository as UserProfileApiRepository,
   type UserProfileRegistration,
 } from "@radar/application";
@@ -20,7 +21,7 @@ const same = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
 export class PrismaProfileRegistrationRepository
-  implements ProfileRegistrationRepository, UserProfileApiRepository
+  implements ProfileRegistrationRepository, TelegramUserRepository, UserProfileApiRepository
 {
   readonly #client: DatabaseClient;
 
@@ -30,6 +31,11 @@ export class PrismaProfileRegistrationRepository
 
   countProfiles(): Promise<number> {
     return this.#client.companyProfileRevision.count();
+  }
+
+  async findByTelegramUserId(telegramUserId: string): Promise<User | null> {
+    const record = await this.#client.user.findUnique({ where: { telegramUserId } });
+    return record === null ? null : userFromRecord(record);
   }
 
   async findLatest(userId: User["id"]): Promise<UserProfileRegistration | null> {

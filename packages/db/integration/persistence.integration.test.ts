@@ -7,29 +7,36 @@ import {
   executeClassification,
   executeDeduplication,
   executeNormalization,
+  deliverTelegramOpportunities,
   ingestSource,
   listSignalOpportunities,
   patchUserProfile,
   processOfflinePipeline,
   submitSignalFeedback,
+  submitTelegramDeliveryFeedback,
   type Classifier,
   type Deduplicator,
   type RawItemNormalizer,
 } from "@radar/application";
 import { FakeAIProvider } from "@radar/ai-adapters";
+import { FakeDeliveryAdapter } from "@radar/delivery-adapters";
 import { AI_ANALYSIS_SCHEMA_VERSION_V1 } from "@radar/contracts";
 import {
   CLASSIFIER_VERSION_V1,
   classifyCandidateV1,
   correlationId,
+  createPendingDelivery,
   createRawItem,
   createSource,
   createUser,
   createUserProfile,
   DEDUPLICATOR_VERSION_V1,
   deduplicateCandidatesV1,
+  deliveryId,
   feedbackId,
   isAiProcessingPermitted,
+  markDeliveryFailed,
+  markDeliverySent,
   NORMALIZER_VERSION_V1,
   normalizeRawItemV1,
   normalizedItemId,
@@ -52,6 +59,7 @@ import {
   PrismaAnalysisRepository,
   PrismaClassificationRepository,
   PrismaDeduplicationRepository,
+  PrismaDeliveryRepository,
   PrismaFeedbackRepository,
   PrismaRawItemRepository,
   PrismaNormalizationOutcomeRepository,
@@ -195,6 +203,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await database().feedback.deleteMany();
+  await database().delivery.deleteMany();
   await database().recommendationSource.deleteMany();
   await database().recommendation.deleteMany();
   await database().analysisSource.deleteMany();
@@ -721,6 +730,77 @@ describe("PostgreSQL persistence", () => {
       ),
     ).toMatchObject({ signal: { id: firstOpportunity.signal.id } });
 
+    const feedbackRepository = new PrismaFeedbackRepository(client);
+    const deliveryRepository = new PrismaDeliveryRepository(client);
+    const deliveryAdapter = new FakeDeliveryAdapter();
+    const deliveryInput = {
+      deliveryIdFactory: () => deliveryId("74000000-0000-4000-8000-000000000001"),
+      interactionId: "telegram-update-1",
+      limit: 1,
+      mode: "NEW" as const,
+      now: () => "2026-09-10T01:30:00.000Z",
+      port: deliveryAdapter,
+      repositories: {
+        deliveries: deliveryRepository,
+        saved: opportunityRepository,
+        signals: opportunityRepository,
+        users: repositories.profiles,
+      },
+      telegramUserId: constructionRegistration.user.telegramUserId,
+    };
+    const delivered = await deliverTelegramOpportunities(deliveryInput);
+    const replayedDelivery = await deliverTelegramOpportunities(deliveryInput);
+    expect(delivered.deliveries[0]).toMatchObject({ status: "SENT" });
+    expect(replayedDelivery.deliveries[0]?.id).toBe(delivered.deliveries[0]?.id);
+    expect(deliveryAdapter.sent).toHaveLength(1);
+    expect(await client.delivery.count()).toBe(1);
+
+    const pendingRace = await deliveryRepository.save(
+      createPendingDelivery({
+        channel: "TELEGRAM",
+        correlationId: firstOpportunity.recommendation.correlationId,
+        createdAt: "2026-09-10T01:32:00.000Z",
+        id: deliveryId("74000000-0000-4000-8000-000000000002"),
+        idempotencyKey: "telegram-terminal-race",
+        kind: "OPPORTUNITY",
+        recommendationId: firstOpportunity.recommendation.id,
+        userId: constructionRegistration.user.id,
+      }),
+    );
+    const racedOutcomes = await Promise.allSettled([
+      deliveryRepository.save(
+        markDeliverySent(pendingRace, "race-provider-message", "2026-09-10T01:33:00.000Z"),
+      ),
+      deliveryRepository.save(
+        markDeliveryFailed(
+          pendingRace,
+          "RACE_FAILURE",
+          "Safe concurrent failure",
+          "2026-09-10T01:33:00.000Z",
+        ),
+      ),
+    ]);
+    expect(racedOutcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+    expect(racedOutcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+    expect((await deliveryRepository.findById(pendingRace.id))?.status).toMatch(/^(FAILED|SENT)$/);
+
+    const savedFeedback = await submitTelegramDeliveryFeedback({
+      action: "SAVED",
+      deliveryId: deliveryId("74000000-0000-4000-8000-000000000001"),
+      feedbackId: feedbackId("75000000-0000-4000-8000-000000000001"),
+      now: "2026-09-10T01:31:00.000Z",
+      repositories: {
+        deliveries: deliveryRepository,
+        feedback: feedbackRepository,
+        users: repositories.profiles,
+      },
+      telegramUserId: constructionRegistration.user.telegramUserId,
+    });
+    expect(savedFeedback).toMatchObject({ created: true, feedback: { action: "SAVED" } });
+    expect(
+      await opportunityRepository.listSavedForUser(constructionRegistration.user.id, 5),
+    ).toHaveLength(1);
+
     const updatedProfile = await patchUserProfile({
       callerUserId: constructionRegistration.user.id,
       now: "2026-09-10T02:00:00.000Z",
@@ -745,7 +825,6 @@ describe("PostgreSQL persistence", () => {
       ).items,
     ).toHaveLength(0);
 
-    const feedbackRepository = new PrismaFeedbackRepository(client);
     const feedbackInput = {
       action: "USEFUL" as const,
       callerUserId: constructionRegistration.user.id,
@@ -763,7 +842,7 @@ describe("PostgreSQL persistence", () => {
     });
     expect(feedbackCreated.created).toBe(true);
     expect(feedbackRepeated.created).toBe(false);
-    expect(await client.feedback.count()).toBe(1);
+    expect(await client.feedback.count()).toBe(2);
     await expect(
       submitSignalFeedback({
         action: "NOT_USEFUL",

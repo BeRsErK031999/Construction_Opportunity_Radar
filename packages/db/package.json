@@ -28,6 +28,7 @@
   "devDependencies": {
     "@radar/ai-adapters": "workspace:*",
     "@radar/contracts": "workspace:*",
+    "@radar/delivery-adapters": "workspace:*",
     "@radar/source-adapters": "workspace:*",
     "@testcontainers/postgresql": "12.1.0",
     "@types/pg": "8.18.0",

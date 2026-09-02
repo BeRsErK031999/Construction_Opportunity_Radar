@@ -222,11 +222,11 @@ Fastify exposes health first, then signals, sources, profiles, and feedback. All
 
 ### Telegram delivery
 
-Use grammY and long polling for the closed MVP behind `DeliveryPort`. Commands/screens cover onboarding, interests/regions/profile, frequency, current digest, saved opportunities, provenance, help, and feedback.
+Use grammY and long polling for the closed MVP behind `DeliveryPort`. ART-015 implements private-chat access for pre-registered users, the exact five-item menu, current and saved opportunity cards, profile inspection, help, and card feedback. Interactive onboarding/profile editing, frequency, and scheduled digest remain separate product steps.
 
-Cards show score, why it matters, practical actions, and source links. Store delivery/idempotency state and callback outcomes. A fake delivery adapter supports local/CI tests without a token.
+Cards show score, why it matters, the first two-to-three prioritized practical actions, and the permitted source link. A `Delivery` is persisted as `PENDING` before transport and then as immutable `SENT` or `FAILED`; `(channel, interaction + recommendation)` makes replay idempotent. Callback payloads carry only a compact action and delivery UUID, then persist feedback with the user/recommendation/delivery/correlation chain. A fake delivery adapter supports local/CI tests without a token.
 
-The bot is a delivery interface, not a reader for arbitrary third-party channels. Tokens remain only in secrets/env and never in Git or logs.
+The bot is a delivery interface, not a reader for arbitrary third-party channels. Tokens remain only in secrets/env and never in Git or logs; no live Bot API call is part of the offline verification path.
 
 ### Feedback and outcomes
 

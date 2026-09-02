@@ -87,8 +87,8 @@ export interface ApiConfig {
 export class ConfigurationError extends Error {
   readonly issues: readonly string[];
 
-  constructor(issues: readonly string[]) {
-    super(`Invalid API configuration: ${issues.join("; ")}`);
+  constructor(issues: readonly string[], component = "application") {
+    super(`Invalid ${component} configuration: ${issues.join("; ")}`);
     this.name = "ConfigurationError";
     this.issues = Object.freeze([...issues]);
   }
@@ -103,7 +103,7 @@ export const loadApiConfig = (environment: NodeJS.ProcessEnv = process.env): Api
   const result = ApiEnvironmentSchema.safeParse(environment);
 
   if (!result.success) {
-    throw new ConfigurationError(result.error.issues.map(formatIssue));
+    throw new ConfigurationError(result.error.issues.map(formatIssue), "API");
   }
 
   return Object.freeze({
