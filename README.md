@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-010` закрывают детерминированную часть первой офлайн-цепочки: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization, exact/near deduplication, классификация без AI и profile-specific Opportunity Score. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. `ART-011` добавляет provider-independent `AIProvider`, повторную permission-проверку перед AI и детерминированный fake-адаптер. Следующий critical-path пункт — `ART-012 Structured AI contract`.
+`ART-004`–`ART-012` реализуют компоненты первой офлайн-цепочки: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, profile-specific Opportunity Score, provider-independent `AIProvider` и строгий `ai-analysis/v1` контракт. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-013 Full offline pipeline`, который соединит компоненты в один повторяемый run.
 
 Первый продуктовый контур:
 
@@ -28,8 +28,9 @@
 9. [docs/runbooks/FIXTURE_CLASSIFICATION.md](docs/runbooks/FIXTURE_CLASSIFICATION.md) — правила classifier-v1, fixture-метрики и повторный запуск.
 10. [docs/runbooks/OPPORTUNITY_SCORING.md](docs/runbooks/OPPORTUNITY_SCORING.md) — формула, company-fit rules, bands и guardrails scoring-v1.
 11. [docs/runbooks/FAKE_AI_PROVIDER.md](docs/runbooks/FAKE_AI_PROVIDER.md) — provider-neutral AI contract, permission boundary, fake-режимы и failure taxonomy.
-12. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-13. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+12. [docs/runbooks/STRUCTURED_AI_CONTRACT.md](docs/runbooks/STRUCTURED_AI_CONTRACT.md) — `ai-analysis/v1`, relational validation, identity/provenance checks и invalid-response outcome.
+13. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+14. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -98,7 +99,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-012`: versioned Zod-контракт AI output с негативными contract tests и запретом успешного статуса для невалидного ответа.
+Реализовать `ART-013`: синхронный offline orchestrator и команду `process:fixtures`, которые соединят persistence, rules, fake analysis и scoring с идемпотентными счётчиками стадий.
 
 ## Источники планирования
 

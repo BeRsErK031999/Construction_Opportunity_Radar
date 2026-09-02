@@ -72,6 +72,9 @@ importers:
       '@radar/application':
         specifier: workspace:*
         version: link:../../application
+      '@radar/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
       '@radar/core':
         specifier: workspace:*
         version: link:../../core
@@ -108,6 +111,9 @@ importers:
 
   packages/contracts:
     dependencies:
+      '@radar/core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: 4.5.4
         version: 4.5.4

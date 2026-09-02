@@ -28,12 +28,13 @@ healthCheck() -> HEALTHY | UNHEALTHY with safe failure metadata
 modelInfo() -> provider/model, capabilities, maxInputCharacters
 ```
 
-The current port returns domain `Analysis`. `FakeAIProvider` constructs that value through core factories, which enforce fact provenance, inference bases, confidence, score, version, and success/failure exclusivity. `ART-012` adds a versioned Zod transport schema for parsing untrusted model output before it becomes a successful domain Analysis.
+The port returns domain `Analysis`. Since `ART-012`, `FakeAIProvider` first generates an `ai-analysis/v1` response and passes it through the shared schema, request-identity, provenance, and domain mapper. The fake therefore exercises the same validation boundary intended for the later Ollama adapter.
 
 ## Deterministic fake modes
 
 - Default `SUCCESS`: the same request returns the same fact/inference IDs and Analysis payload. Each fact is an excerpt of supplied evidence and retains its source ID.
 - `FAILED_ANALYSIS`: returns a valid `Analysis` with status `FAILED`, configured stable code, and retryability.
+- `INVALID_RESPONSE`: generates a response that violates `ai-analysis/v1`; the mapper returns `FAILED / AI_INVALID_RESPONSE`.
 - `THROW`: rejects with a safe `AIProviderError` for transport/runtime failure tests.
 - `healthStatus: UNHEALTHY`: reports `AI_UNAVAILABLE` without contacting anything.
 - `maxInputCharacters`: advertises and enforces a deterministic combined title/text bound.

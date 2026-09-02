@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { createAIAnalysisRequest } from "@radar/application";
+import { AI_ANALYSIS_SCHEMA_VERSION_V1 } from "@radar/contracts";
 import {
   analysisId,
   correlationId,
@@ -79,7 +80,7 @@ const request = () => {
     createdAt: timestamp,
     evidence: [{ normalizedItem: item, source }],
     promptVersion: "prompt-v1",
-    schemaVersion: "analysis-schema-v1",
+    schemaVersion: AI_ANALYSIS_SCHEMA_VERSION_V1,
     signal,
   });
 };
@@ -101,7 +102,7 @@ describe("FakeAIProvider", () => {
       model: "fixture-analysis-v1",
       promptVersion: "prompt-v1",
       provider: "fake",
-      schemaVersion: "analysis-schema-v1",
+      schemaVersion: AI_ANALYSIS_SCHEMA_VERSION_V1,
       signalId: "signal-hotel-tender",
       sourceIds: ["source-hotel-tender"],
       status: "SUCCEEDED",
@@ -149,6 +150,17 @@ describe("FakeAIProvider", () => {
     await expect(provider.analyzeSignal(request())).resolves.toMatchObject({
       failureCode: "AI_INVALID_RESPONSE",
       failureReason: "Fake provider was configured to return a failed analysis",
+      retryable: false,
+      status: "FAILED",
+    });
+  });
+
+  it("turns an invalid generated response into a failed analysis", async () => {
+    const provider = new FakeAIProvider({ behavior: { mode: "INVALID_RESPONSE" } });
+
+    await expect(provider.analyzeSignal(request())).resolves.toMatchObject({
+      failureCode: "AI_INVALID_RESPONSE",
+      failureReason: "AI response failed ai-analysis/v1 schema validation",
       retryable: false,
       status: "FAILED",
     });

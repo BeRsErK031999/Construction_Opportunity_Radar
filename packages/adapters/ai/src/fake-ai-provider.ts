@@ -8,18 +8,13 @@ import {
   type AIProviderHealth,
   type AIProviderModelInfo,
 } from "@radar/application";
-import {
-  createFailedAnalysis,
-  createSuccessfulAnalysis,
-  factId,
-  inferenceId,
-  nonEmptyString,
-  type Analysis,
-  type FactId,
-} from "@radar/core";
+import { createFailedAnalysis, nonEmptyString, type Analysis } from "@radar/core";
+
+import { analysisFromAIResponseV1 } from "./ai-analysis-response-v1.js";
 
 export type FakeAIProviderBehavior =
   | { readonly mode: "SUCCESS" }
+  | { readonly mode: "INVALID_RESPONSE" }
   | {
       readonly code: AIProviderErrorCode;
       readonly mode: "FAILED_ANALYSIS";
@@ -125,13 +120,15 @@ export class FakeAIProvider implements AIProvider {
     }
 
     const facts = request.evidence.map((evidence) => ({
-      id: factId(
-        deterministicId("fact", [request.analysisId, evidence.normalizedItemId, evidence.sourceId]),
-      ),
+      id: deterministicId("fact", [
+        request.analysisId,
+        evidence.normalizedItemId,
+        evidence.sourceId,
+      ]),
       sourceIds: [evidence.sourceId],
       statement: compactText(evidence.text, 4_000),
     }));
-    const basisFactIds = facts.map(({ id }) => id) as readonly FactId[];
+    const basisFactIds = facts.map(({ id }) => id);
     const primaryEvidence = request.evidence[0];
     if (primaryEvidence === undefined) {
       return Promise.reject(new AIProviderError("AI_INVALID_REQUEST", false));
@@ -139,55 +136,65 @@ export class FakeAIProvider implements AIProvider {
     const primaryText = compactText(primaryEvidence.title ?? primaryEvidence.text, 460);
     const sourceCount = new Set(request.evidence.map(({ sourceId }) => sourceId)).size;
 
+    const response = {
+      actionability: 75,
+      analysisId: request.analysisId,
+      analysisVersion: request.analysisVersion,
+      businessImpact: Math.round(
+        (request.signal.relevanceScore + request.signal.classificationConfidence) / 2,
+      ),
+      candidateActions: [
+        {
+          kind: "VERIFY",
+          priority: 1,
+          rationale: "Подтвердить факты по сохранённым URL до принятия решения.",
+          title: "Проверить исходные материалы",
+        },
+        {
+          kind: "REVIEW",
+          priority: 2,
+          rationale: "Оценить соответствие сигнала профилю компании и текущим приоритетам.",
+          title: "Провести внутреннюю оценку",
+        },
+      ],
+      confidence: request.signal.classificationConfidence / 100,
+      correlationId: request.signal.correlationId,
+      createdAt: request.createdAt,
+      deadline: null,
+      entities: uniqueEntities(request),
+      eventType: request.signal.category,
+      facts,
+      headline: compactText(`Тестовый анализ: ${primaryText}`, 500),
+      inferences: [
+        {
+          basisFactIds,
+          id: deterministicId("inference", [request.analysisId, request.signal.id]),
+          statement: `Сигнал категории ${request.signal.category} требует проверки применимости к профилю компании.`,
+        },
+      ],
+      model: this.#model,
+      promptVersion: request.promptVersion,
+      provider: this.#provider,
+      risks: [
+        "Анализ создан детерминированным тестовым провайдером.",
+        "Перед действием необходимо проверить исходные материалы.",
+      ],
+      schemaVersion: request.schemaVersion,
+      signalId: request.signal.id,
+      sourceIds: [...new Set(facts.flatMap(({ sourceIds }) => sourceIds))],
+      status: "SUCCEEDED",
+      summary: `Сигнал ${request.signal.id} подтверждён ${String(sourceCount)} разрешёнными источниками в тестовом сценарии.`,
+      urgency: Math.round(request.signal.classificationConfidence),
+      whyImportant: `Категория ${request.signal.category} прошла детерминированную классификацию для вертикали ${request.signal.vertical}.`,
+    };
+    const rawResponse =
+      this.#behavior.mode === "INVALID_RESPONSE" ? { ...response, facts: [] } : response;
+
     return Promise.resolve(
-      createSuccessfulAnalysis({
-        actionability: 75,
-        analysisVersion: request.analysisVersion,
-        businessImpact: Math.round(
-          (request.signal.relevanceScore + request.signal.classificationConfidence) / 2,
-        ),
-        candidateActions: [
-          {
-            kind: "VERIFY",
-            priority: 1,
-            rationale: "Подтвердить факты по сохранённым URL до принятия решения.",
-            title: "Проверить исходные материалы",
-          },
-          {
-            kind: "REVIEW",
-            priority: 2,
-            rationale: "Оценить соответствие сигнала профилю компании и текущим приоритетам.",
-            title: "Провести внутреннюю оценку",
-          },
-        ],
-        confidence: request.signal.classificationConfidence / 100,
-        correlationId: request.signal.correlationId,
-        createdAt: request.createdAt,
-        deadline: null,
-        entities: uniqueEntities(request),
-        eventType: request.signal.category,
-        facts,
-        headline: compactText(`Тестовый анализ: ${primaryText}`, 500),
-        id: request.analysisId,
-        inferences: [
-          {
-            basisFactIds,
-            id: inferenceId(deterministicId("inference", [request.analysisId, request.signal.id])),
-            statement: `Сигнал категории ${request.signal.category} требует проверки применимости к профилю компании.`,
-          },
-        ],
+      analysisFromAIResponseV1(rawResponse, {
         model: this.#model,
-        promptVersion: request.promptVersion,
         provider: this.#provider,
-        risks: [
-          "Анализ создан детерминированным тестовым провайдером.",
-          "Перед действием необходимо проверить исходные материалы.",
-        ],
-        schemaVersion: request.schemaVersion,
-        signalId: request.signal.id,
-        summary: `Сигнал ${request.signal.id} подтверждён ${String(sourceCount)} разрешёнными источниками в тестовом сценарии.`,
-        urgency: Math.round(request.signal.classificationConfidence),
-        whyImportant: `Категория ${request.signal.category} прошла детерминированную классификацию для вертикали ${request.signal.vertical}.`,
+        request,
       }),
     );
   }

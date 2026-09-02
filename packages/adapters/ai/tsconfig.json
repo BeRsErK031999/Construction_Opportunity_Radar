@@ -7,5 +7,9 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../application" }, { "path": "../../core" }]
+  "references": [
+    { "path": "../../application" },
+    { "path": "../../contracts" },
+    { "path": "../../core" }
+  ]
 }

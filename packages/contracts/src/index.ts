@@ -1,4 +1,9 @@
 export {
+  AI_ANALYSIS_SCHEMA_VERSION_V1,
+  AIAnalysisResponseV1Schema,
+  type AIAnalysisResponseV1,
+} from "./ai-analysis-v1.js";
+export {
   FixtureIngestionDatasetV1Schema,
   FixtureItemLabelsV1Schema,
   FixtureItemV1Schema,

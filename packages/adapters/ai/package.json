@@ -15,6 +15,7 @@
   ],
   "dependencies": {
     "@radar/application": "workspace:*",
+    "@radar/contracts": "workspace:*",
     "@radar/core": "workspace:*"
   }
 }
