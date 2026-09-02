@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-009` закрывают первую офлайн-цепочку данных: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization, exact/near deduplication и детерминированная классификация без AI. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-010 Opportunity scoring`.
+`ART-004`–`ART-010` закрывают детерминированную часть первой офлайн-цепочки: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization, exact/near deduplication, классификация без AI и profile-specific Opportunity Score. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-011 AI provider abstraction`.
 
 Первый продуктовый контур:
 
@@ -26,8 +26,9 @@
 7. [docs/runbooks/LOCAL_POSTGRESQL.md](docs/runbooks/LOCAL_POSTGRESQL.md) — запуск PostgreSQL, migrations, seed и integration tests.
 8. [docs/runbooks/RSS_HTTP_ADAPTER.md](docs/runbooks/RSS_HTTP_ADAPTER.md) — безопасный контракт RSS/HTTP collector и условия live smoke.
 9. [docs/runbooks/FIXTURE_CLASSIFICATION.md](docs/runbooks/FIXTURE_CLASSIFICATION.md) — правила classifier-v1, fixture-метрики и повторный запуск.
-10. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-11. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+10. [docs/runbooks/OPPORTUNITY_SCORING.md](docs/runbooks/OPPORTUNITY_SCORING.md) — формула, company-fit rules, bands и guardrails scoring-v1.
+11. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+12. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -96,7 +97,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-010`: чистую versioned-функцию Opportunity Score из пяти факторов с breakdown, порогами и отделённым от глобального сигнала `companyFit`.
+Реализовать `ART-011`: provider-independent порт `AIProvider` и детерминированный `FakeAIProvider` с управляемыми успехами/ошибками без Ollama.
 
 ## Источники планирования
 

@@ -46,7 +46,7 @@ Source
 | `Recommendation`    | Персональная оценка одного signal/analysis для ревизии profile | Все пять факторов и total в `0..100`; scoring version явна; от двух до пяти уникальных действий; provenance не пуст; identity включает profile revision.                                                                                                                                                                                          |
 | `Feedback`          | Одно attributable действие пользователя                        | Только `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, `ALREADY_KNOWN`; всегда есть user/recommendation/correlation, delivery опциональна; повторы определяются по user/recommendation/action.                                                                                                                                                          |
 
-`Analysis.confidence` — вероятность `0..1` из structured AI contract. `Recommendation.scoreBreakdown.confidence` — нормализованный фактор scoring `0..100`; преобразование относится к `ART-010` и не выполняется моделью молча.
+`Analysis.confidence` — вероятность `0..1` из structured AI contract. `opportunity-score-v1` явно преобразует её в `Recommendation.scoreBreakdown.confidence` диапазона `0..100`; модель не управляет весами, thresholds или арифметикой.
 
 ## Persistence mapping для ART-004
 
@@ -80,6 +80,6 @@ Domain остаётся независимым от способа хранен�
 
 - Application repository ports принадлежат use cases; Prisma repositories реализуют их в `packages/db`, не раскрывая generated-типы наружу.
 - Полноценная оркестрация стадий и durable job для classification остаются в `ART-013`/`ART-018`; текущая CLI-команда проверяет те же application/domain boundaries синхронно.
-- Формула и пороги band не реализованы до `ART-010`; domain лишь проверяет диапазоны и версию результата.
+- Сохранение Recommendation через application repository и полный analysis/profile orchestration выполняются в `ART-013`; `ART-010` уже выдаёт валидированный breakdown, version, total, band и explanation для существующей persistence-модели.
 - Zod-валидация AI output и provider failure taxonomy относятся к `ART-011`–`ART-012`.
 - `Subscription`, `Delivery`, digest и callback idempotency получают собственные модели в `ART-015`–`ART-018`.

@@ -6,6 +6,7 @@ export * from "./ingestion/raw-item.js";
 export * from "./normalization/normalized-item.js";
 export * from "./normalization/normalizer-v1.js";
 export * from "./recommendation/recommendation.js";
+export * from "./scoring/scoring-v1.js";
 export * from "./shared/identifiers.js";
 export * from "./shared/invariant.js";
 export * from "./shared/primitives.js";

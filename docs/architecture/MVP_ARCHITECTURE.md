@@ -206,6 +206,10 @@ Each factor and total are 0–100. Persist the factor breakdown, rule version, t
 
 `Signal` is global. `Recommendation` references one signal/analysis and one profile and owns `companyFit` and the final Opportunity Score, allowing two companies to receive different explainable rankings for the same signal.
 
+`opportunity-score-v1` freezes weights at `35/25/20/10/10` and uses inclusive bands: `IGNORE < 40`, `LOW >= 40`, `MEDIUM >= 55`, `HIGH >= 70`, `CRITICAL >= 85`. Analysis confidence is a probability and is explicitly converted to the `0..100` scoring factor. Every factor contribution and the arithmetic explanation are returned with the version; `createRecommendationFromScoreV1` maps this exact result into the persisted Recommendation fields.
+
+Company Fit v1 is a separate deterministic profile policy: vertical 30%, region 25%, event type 20%, offering/keyword/target-client terms 15%, and project value/currency 10%. Missing candidate evidence receives a visible neutral factor of 50 instead of being treated as a match. Region, event, offering, and value mismatches remain visible through stable reason codes. An explicitly ignored event or excluded keyword returns the business outcome `EXCLUDED`; no total/band is emitted and no Recommendation should be created. These baseline weights and thresholds are provisional until eval/pilot evidence justifies a new version.
+
 ### API
 
 Fastify exposes health first, then signals, sources, profiles, and feedback. All input/output contracts are versioned/validated. Public exposure is not assumed: localhost/internal access is the default until authentication, authorization, and rate limiting are explicitly configured.
