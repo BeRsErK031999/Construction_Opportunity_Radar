@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-008` закрывают первую офлайн-цепочку данных: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization без изменения raw evidence и exact/near deduplication. Проверенный Docker-run даёт 200 raw, 200 normalized и 150 dedup-кластеров; повторный запуск каждой стадии создаёт 0 записей. Следующий critical-path пункт — `ART-006 RSS/HTTP adapter`.
+`ART-004`–`ART-008` закрывают первую офлайн-цепочку данных: PostgreSQL persistence, идемпотентный импорт 200 fixtures, versioned normalization без изменения raw evidence и exact/near deduplication. `ART-006` добавляет offline-tested RSS 2.0/Atom collector с bounded HTTP, retry/rate-limit, provenance и permission boundary. Следующий critical-path пункт — `ART-009 Vertical classifier and relevance rules`.
 
 Первый продуктовый контур:
 
@@ -24,8 +24,9 @@
 5. [docs/architecture/PRE_DEVELOPMENT_AUDIT.md](docs/architecture/PRE_DEVELOPMENT_AUDIT.md) — результат ART-001, planned tree, зависимости, порты, env и тестовая стратегия.
 6. [docs/architecture/DOMAIN_MODEL.md](docs/architecture/DOMAIN_MODEL.md) — словарь ART-003, инварианты и mapping к PostgreSQL.
 7. [docs/runbooks/LOCAL_POSTGRESQL.md](docs/runbooks/LOCAL_POSTGRESQL.md) — запуск PostgreSQL, migrations, seed и integration tests.
-8. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-9. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+8. [docs/runbooks/RSS_HTTP_ADAPTER.md](docs/runbooks/RSS_HTTP_ADAPTER.md) — безопасный контракт RSS/HTTP collector и условия live smoke.
+9. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+10. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -93,7 +94,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-006`: generic RSS/HTTP source adapter с ограниченными timeout/retry/rate-limit, полным provenance и offline fixture tests; live smoke выполнять только для явно одобренного источника.
+Реализовать `ART-009`: детерминированный versioned classifier/relevance baseline для `CONSTRUCTION`, `HORECA`, `OTHER`, который работает только с уникальными permitted-кандидатами и не вызывает AI.
 
 ## Источники планирования
 

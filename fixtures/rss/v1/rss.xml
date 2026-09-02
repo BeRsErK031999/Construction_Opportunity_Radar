@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Строительные возможности</title>
+    <link>https://approved-source.example/news</link>
+    <description>Проверяемая RSS-фикстура проекта</description>
+    <item>
+      <guid isPermaLink="false">construction-notice-42</guid>
+      <title>Капитальный ремонт школы</title>
+      <link>https://approved-source.example/notices/42?utm_source=rss</link>
+      <pubDate>Tue, 01 Sep 2026 03:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<p>Объявлен отбор подрядчика на капитальный ремонт школы.</p>]]></content:encoded>
+    </item>
+    <item>
+      <guid>https://approved-source.example/notices/43</guid>
+      <title>Поставка строительных материалов</title>
+      <description><![CDATA[Требуется поставка строительных материалов до 20 октября.]]></description>
+      <pubDate>invalid external date</pubDate>
+    </item>
+  </channel>
+</rss>

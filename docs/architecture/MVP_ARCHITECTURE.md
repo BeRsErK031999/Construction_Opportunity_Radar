@@ -109,6 +109,8 @@ Collectors must:
 - refuse AI enqueue when rights or `ai_processing_allowed` do not permit it;
 - use timeout, bounded retry, rate limits, and an identifying user-agent for live HTTP.
 
+`rss-http-v1` is the first live-source-capable adapter. Its production transport limits a response to 2 MiB, uses a 10-second request timeout, performs at most three attempts for network failures and selected transient HTTP statuses, applies exponential backoff plus `Retry-After`, and reserves requests per origin at least one second apart. RSS 2.0 and Atom mapping is versioned; parsed item payloads retain feed URL/format, external identity, raw publication value, original URL, title, and unnormalized item text. Transport, clock, and sleep are injected so all collector tests remain offline.
+
 Collection and AI permission are deliberately separate. A disabled or `BLOCKED` source is not fetched. `REVIEW_REQUIRED` material may be preserved as raw evidence only in the controlled fixture/manual review flow; a live source still cannot be fetched. Review material is never returned as AI-processing-permitted until the registry has both an eligible rights status and a documented basis.
 
 Telegram ingestion is not a special central path. A future permitted/partner Telegram source must implement the same source port and rights checks. Mass unauthorized scraping is out of scope.

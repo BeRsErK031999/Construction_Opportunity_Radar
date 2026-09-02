@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>HoReCa opportunities</title>
+  <id>https://approved-source.example/horeca/feed</id>
+  <updated>2026-09-01T04:00:00Z</updated>
+  <entry>
+    <id>horeca-opening-7</id>
+    <title>Открытие ресторана</title>
+    <link rel="alternate" href="https://approved-source.example/horeca/7" />
+    <updated>2026-09-01T04:00:00+07:00</updated>
+    <summary>В Барнауле открывается ресторан на 80 посадочных мест.</summary>
+  </entry>
+</feed>
