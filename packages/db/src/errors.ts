@@ -58,3 +58,10 @@ export class RecommendationIdentityConflictError extends PersistenceError {
     this.name = "RecommendationIdentityConflictError";
   }
 }
+
+export class JobStateConflictError extends PersistenceError {
+  constructor(message: string) {
+    super("JOB_STATE_CONFLICT", message);
+    this.name = "JobStateConflictError";
+  }
+}

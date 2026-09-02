@@ -120,6 +120,23 @@ enum DigestKind {
   WEEKLY
 }
 
+enum ProcessingJobType {
+  fetchSources
+  normalize
+  deduplicate
+  classify
+  analyze
+  buildDigest
+  deliverDigest
+}
+
+enum ProcessingJobStatus {
+  SCHEDULED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 model Source {
   id                    String                 @id @db.Uuid
   name                  String                 @db.VarChar(300)
@@ -536,4 +553,33 @@ model Feedback {
   @@unique([userId, recommendationId, action], map: "feedback_identity_key")
   @@index([createdAt], map: "feedback_created_idx")
   @@map("feedback")
+}
+
+model ProcessingJob {
+  id                String              @id @db.Uuid
+  jobType           ProcessingJobType   @map("job_type")
+  entityKey         String              @map("entity_key") @db.VarChar(200)
+  concurrencyKey    String              @map("concurrency_key") @db.VarChar(200)
+  idempotencyKey    String              @map("idempotency_key") @db.VarChar(200)
+  payload           Json                @db.JsonB
+  payloadVersion    String              @map("payload_version") @db.VarChar(100)
+  status            ProcessingJobStatus
+  attempts          Int
+  maxAttempts       Int                 @map("max_attempts")
+  scheduledAt       DateTime            @map("scheduled_at") @db.Timestamptz(3)
+  lockedAt          DateTime?           @map("locked_at") @db.Timestamptz(3)
+  leaseExpiresAt    DateTime?           @map("lease_expires_at") @db.Timestamptz(3)
+  leaseOwner        String?             @map("lease_owner") @db.VarChar(200)
+  lastErrorCode     String?             @map("last_error_code") @db.VarChar(100)
+  lastErrorReason   String?             @map("last_error_reason") @db.Text
+  correlationId     String              @map("correlation_id") @db.Uuid
+  completedAt       DateTime?           @map("completed_at") @db.Timestamptz(3)
+  createdAt         DateTime            @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime            @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([jobType, idempotencyKey], map: "processing_jobs_identity_key")
+  @@index([status, scheduledAt], map: "processing_jobs_claim_idx")
+  @@index([status, leaseExpiresAt], map: "processing_jobs_stale_idx")
+  @@index([jobType, entityKey, status], map: "processing_jobs_entity_status_idx")
+  @@map("processing_jobs")
 }

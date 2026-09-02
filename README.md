@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-017` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop и versioned Digest. grammY-бот принимает все пять MVP-действий и доставляет on-demand daily top-5; weekly summary содержит pipeline-метрики и рост категорий. Следующий critical-path пункт — `ART-018 Durable jobs and scheduler`.
+`ART-004`–`ART-018` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest и durable job runtime. Scheduler/worker поддерживает семь pipeline/digest job-типов, atomic claim, no-overlap, bounded retry и restart recovery. Следующий critical-path пункт — `ART-019 Eval dataset`.
 
 Первый продуктовый контур:
 
@@ -33,8 +33,9 @@
 14. [docs/runbooks/TELEGRAM_UI.md](docs/runbooks/TELEGRAM_UI.md) — меню, карточка, delivery state, offline-проверка и условия live smoke.
 15. [docs/runbooks/FEEDBACK_LOOP.md](docs/runbooks/FEEDBACK_LOOP.md) — пять outcomes, idempotency, определения метрик и rollback constraint.
 16. [docs/runbooks/DIGEST.md](docs/runbooks/DIGEST.md) — daily/weekly periods, top-5, weekly metrics, idempotency и recovery.
-17. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-18. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+17. [docs/runbooks/DURABLE_JOBS.md](docs/runbooks/DURABLE_JOBS.md) — job states, scheduler windows, claim/lease/retry/recovery и операционная диагностика.
+18. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+19. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -115,7 +116,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-018`: PostgreSQL-backed durable jobs и scheduler для стадий pipeline, включая `buildDigest`/`deliverDigest`, с transactional claim, bounded retry, stale-lock recovery и restart evidence.
+Реализовать `ART-019`: отделить от ingestion fixtures размеченный gold set из 200 Construction/HoReCa материалов с relevance, event type, фактами, ожидаемым действием и importance для воспроизводимого AI benchmark.
 
 ## Источники планирования
 

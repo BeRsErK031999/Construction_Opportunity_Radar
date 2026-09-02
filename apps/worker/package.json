@@ -1,0 +1,13 @@
+{
+  "name": "@radar/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "dependencies": {
+    "@radar/config": "workspace:*",
+    "@radar/db": "workspace:*",
+    "@radar/jobs": "workspace:*",
+    "@radar/observability": "workspace:*"
+  }
+}

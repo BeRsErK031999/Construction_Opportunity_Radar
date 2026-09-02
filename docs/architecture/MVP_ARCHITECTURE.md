@@ -137,7 +137,7 @@ The checked-in fixture corpus produces 150 classification decisions: 110 AI-elig
 
 ### PostgreSQL jobs
 
-The MVP uses a `processing_jobs` table with job type, entity/idempotency key, status, attempts, `scheduled_at`, `locked_at`, lease owner, and last error. Workers use transactional claiming, bounded exponential backoff, stale-lock recovery, and terminal `FAILED` status. Redis is unnecessary until PostgreSQL is proven insufficient.
+The MVP uses a `processing_jobs` table with job type, versioned payload, entity/concurrency/idempotency keys, correlation ID, status, attempts, `scheduled_at`, `locked_at`, explicit lease expiry/owner, completion time, and last error. Workers use `FOR UPDATE SKIP LOCKED` transactional claiming, owner-checked lease renewal/completion, bounded exponential backoff, stale-lock recovery, active-job overlap protection, and terminal `FAILED` status. Fixed-interval schedules derive deterministic current-window idempotency keys; missed windows are not backfilled automatically. Redis is unnecessary until PostgreSQL is proven insufficient.
 
 `ART-013` first proves the same application use cases through a synchronous offline orchestrator. `ART-018` adds durable triggering and scheduling without duplicating domain logic.
 

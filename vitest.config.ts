@@ -14,6 +14,7 @@ export default defineConfig({
       "@radar/core": fromRoot("./packages/core/src/index.ts"),
       "@radar/db": fromRoot("./packages/db/src/index.ts"),
       "@radar/delivery-adapters": fromRoot("./packages/adapters/delivery/src/index.ts"),
+      "@radar/jobs": fromRoot("./packages/jobs/src/index.ts"),
       "@radar/observability": fromRoot("./packages/observability/src/index.ts"),
       "@radar/source-adapters": fromRoot("./packages/adapters/sources/src/index.ts"),
     },

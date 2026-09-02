@@ -52,6 +52,7 @@ import {
   userId,
   userProfileId,
 } from "@radar/core";
+import { scheduleDueJobs, type EnqueueJobInput } from "@radar/jobs";
 import {
   createFixtureSources,
   FixtureSourceAdapter,
@@ -72,6 +73,7 @@ import {
   PrismaRawItemRepository,
   PrismaNormalizationOutcomeRepository,
   PrismaProfileRegistrationRepository,
+  PrismaProcessingJobRepository,
   PrismaSourceRepository,
   PrismaRecommendationRepository,
   PrismaSignalOpportunityRepository,
@@ -210,6 +212,7 @@ beforeAll(async () => {
 }, 120_000);
 
 beforeEach(async () => {
+  await database().processingJob.deleteMany();
   await database().feedback.deleteMany();
   await database().delivery.deleteMany();
   await database().digestDelivery.deleteMany();
@@ -227,6 +230,21 @@ beforeEach(async () => {
   await database().normalizedItem.deleteMany();
   await database().rawItem.deleteMany();
   await database().source.deleteMany();
+});
+
+const testJobInput = (overrides: Partial<EnqueueJobInput> = {}): EnqueueJobInput => ({
+  concurrencyKey: "source:30000000-0000-4000-8000-000000000001",
+  correlationId: "82000000-0000-4000-8000-000000000001",
+  createdAt: "2026-09-02T10:00:00.000Z",
+  entityKey: "source:30000000-0000-4000-8000-000000000001",
+  id: "81000000-0000-4000-8000-000000000001",
+  idempotencyKey: "source-1:2026-09-02T10:00:00.000Z",
+  maxAttempts: 2,
+  payload: { sourceId: "30000000-0000-4000-8000-000000000001" },
+  payloadVersion: "fetch-source-v1",
+  scheduledAt: "2026-09-02T10:00:00.000Z",
+  type: "fetchSources",
+  ...overrides,
 });
 
 afterAll(async () => {
@@ -1036,5 +1054,186 @@ describe("PostgreSQL persistence", () => {
         signalId: secondOpportunity.signal.id,
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+describe("PostgreSQL processing jobs", () => {
+  it("enqueues idempotently, blocks overlap, and allows only one concurrent claim", async () => {
+    const repository = new PrismaProcessingJobRepository(database());
+    const first = testJobInput();
+    const [created, repeated] = await Promise.all([
+      repository.enqueue(first),
+      repository.enqueue(first),
+    ]);
+    expect([created.outcome, repeated.outcome].sort()).toEqual(["CREATED", "EXISTING"]);
+
+    const overlap = await repository.enqueue(
+      testJobInput({
+        correlationId: "82000000-0000-4000-8000-000000000002",
+        id: "81000000-0000-4000-8000-000000000002",
+        idempotencyKey: "source-1:2026-09-02T10:01:00.000Z",
+      }),
+    );
+    expect(overlap).toMatchObject({ outcome: "OVERLAP_BLOCKED", job: { id: first.id } });
+
+    const claims = await Promise.all(
+      Array.from({ length: 8 }, (_, index) =>
+        repository.claimNext({
+          leaseExpiresAt: "2026-09-02T10:01:00.000Z",
+          now: "2026-09-02T10:00:00.000Z",
+          workerId: `worker-${String(index)}`,
+        }),
+      ),
+    );
+    expect(claims.filter((job) => job !== null)).toHaveLength(1);
+    expect(claims.find((job) => job !== null)).toMatchObject({ attempts: 1, status: "RUNNING" });
+  });
+
+  it("uses the bounded retry budget and records terminal failure", async () => {
+    const repository = new PrismaProcessingJobRepository(database());
+    await repository.enqueue(testJobInput());
+    const first = await repository.claimNext({
+      leaseExpiresAt: "2026-09-02T10:01:00.000Z",
+      now: "2026-09-02T10:00:00.000Z",
+      workerId: "worker-retry",
+    });
+    expect(first).not.toBeNull();
+    const retry = await repository.fail({
+      errorCode: "SOURCE_TIMEOUT",
+      errorReason: "Source timed out",
+      failedAt: "2026-09-02T10:00:10.000Z",
+      jobId: first?.id ?? "",
+      nextScheduledAt: "2026-09-02T10:00:20.000Z",
+      retryable: true,
+      workerId: "worker-retry",
+    });
+    expect(retry).toMatchObject({
+      outcome: "RETRY_SCHEDULED",
+      job: { attempts: 1, scheduledAt: "2026-09-02T10:00:20.000Z", status: "SCHEDULED" },
+    });
+    expect(
+      await repository.claimNext({
+        leaseExpiresAt: "2026-09-02T10:01:00.000Z",
+        now: "2026-09-02T10:00:19.999Z",
+        workerId: "worker-retry",
+      }),
+    ).toBeNull();
+    const second = await repository.claimNext({
+      leaseExpiresAt: "2026-09-02T10:02:00.000Z",
+      now: "2026-09-02T10:00:20.000Z",
+      workerId: "worker-retry",
+    });
+    const terminal = await repository.fail({
+      errorCode: "SOURCE_TIMEOUT",
+      errorReason: "Source timed out again",
+      failedAt: "2026-09-02T10:00:30.000Z",
+      jobId: second?.id ?? "",
+      nextScheduledAt: "2026-09-02T10:00:50.000Z",
+      retryable: true,
+      workerId: "worker-retry",
+    });
+    expect(terminal).toMatchObject({
+      outcome: "TERMINAL_FAILURE",
+      job: {
+        attempts: 2,
+        completedAt: "2026-09-02T10:00:30.000Z",
+        lastErrorCode: "SOURCE_TIMEOUT",
+        status: "FAILED",
+      },
+    });
+  });
+
+  it("recovers an expired lease after process restart without duplicating the job", async () => {
+    if (container === undefined) {
+      throw new Error("Integration database is not initialized");
+    }
+    const firstClient = createDatabaseClient(container.getConnectionUri());
+    await firstClient.$connect();
+    const firstProcess = new PrismaProcessingJobRepository(firstClient);
+    const schedule = {
+      anchorAt: "2026-09-02T10:00:00.000Z",
+      concurrencyKey: "pipeline:global",
+      entityKey: "pipeline:global",
+      everyMs: 60_000,
+      maxAttempts: 2,
+      payload: { normalizerVersion: "normalizer-v1" },
+      payloadVersion: "normalize-v1",
+      scheduleKey: "normalize-global",
+      type: "normalize" as const,
+    };
+    try {
+      expect(
+        await scheduleDueJobs({
+          identities: {
+            correlationId: () => "82000000-0000-4000-8000-000000000003",
+            jobId: () => "81000000-0000-4000-8000-000000000003",
+          },
+          now: "2026-09-02T10:00:30.000Z",
+          repository: firstProcess,
+          schedules: [schedule],
+        }),
+      ).toMatchObject({ created: 1 });
+      await firstProcess.claimNext({
+        leaseExpiresAt: "2026-09-02T10:01:00.000Z",
+        now: "2026-09-02T10:00:30.000Z",
+        workerId: "worker-before-restart",
+      });
+    } finally {
+      await firstClient.$disconnect();
+    }
+
+    const restarted = new PrismaProcessingJobRepository(database());
+    expect(
+      await scheduleDueJobs({
+        identities: {
+          correlationId: () => "82000000-0000-4000-8000-000000000004",
+          jobId: () => "81000000-0000-4000-8000-000000000004",
+        },
+        now: "2026-09-02T10:00:59.000Z",
+        repository: restarted,
+        schedules: [schedule],
+      }),
+    ).toMatchObject({ existing: 1 });
+    const recovery = await restarted.recoverStale({
+      limit: 10,
+      now: "2026-09-02T10:01:00.000Z",
+      retryBaseDelayMs: 5_000,
+      retryMaximumDelayMs: 20_000,
+    });
+    expect(recovery).toMatchObject({ failed: 0, requeued: 1 });
+    const claimed = await restarted.claimNext({
+      leaseExpiresAt: "2026-09-02T10:02:05.000Z",
+      now: "2026-09-02T10:01:05.000Z",
+      workerId: "worker-after-restart",
+    });
+    expect(claimed).toMatchObject({ attempts: 2, id: "81000000-0000-4000-8000-000000000003" });
+    const completed = await restarted.complete({
+      completedAt: "2026-09-02T10:01:06.000Z",
+      jobId: claimed?.id ?? "",
+      workerId: "worker-after-restart",
+    });
+    expect(completed).toMatchObject({ attempts: 2, status: "SUCCEEDED" });
+    expect(await database().processingJob.count()).toBe(1);
+  });
+
+  it("turns a stale final attempt into terminal failure", async () => {
+    const repository = new PrismaProcessingJobRepository(database());
+    await repository.enqueue(testJobInput({ maxAttempts: 1 }));
+    await repository.claimNext({
+      leaseExpiresAt: "2026-09-02T10:00:10.000Z",
+      now: "2026-09-02T10:00:00.000Z",
+      workerId: "worker-crashed",
+    });
+    const recovery = await repository.recoverStale({
+      limit: 10,
+      now: "2026-09-02T10:00:10.000Z",
+      retryBaseDelayMs: 10_000,
+      retryMaximumDelayMs: 20_000,
+    });
+    expect(recovery).toMatchObject({
+      failed: 1,
+      jobs: [{ completedAt: "2026-09-02T10:00:10.000Z", status: "FAILED" }],
+      requeued: 0,
+    });
   });
 });

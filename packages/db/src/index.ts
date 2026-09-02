@@ -10,6 +10,7 @@ export * from "./repositories/delivery-repository.js";
 export * from "./repositories/feedback-repository.js";
 export * from "./repositories/raw-item-repository.js";
 export * from "./repositories/normalization-outcome-repository.js";
+export * from "./repositories/processing-job-repository.js";
 export * from "./repositories/profile-registration-repository.js";
 export * from "./repositories/recommendation-repository.js";
 export * from "./repositories/signal-opportunity-repository.js";

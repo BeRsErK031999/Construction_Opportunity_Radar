@@ -6,12 +6,14 @@
     { "path": "packages/contracts" },
     { "path": "packages/core" },
     { "path": "packages/db" },
+    { "path": "packages/jobs" },
     { "path": "packages/observability" },
     { "path": "packages/adapters/ai" },
     { "path": "packages/adapters/delivery" },
     { "path": "packages/adapters/sources" },
     { "path": "apps/cli" },
     { "path": "apps/api" },
-    { "path": "apps/bot" }
+    { "path": "apps/bot" },
+    { "path": "apps/worker" }
   ]
 }

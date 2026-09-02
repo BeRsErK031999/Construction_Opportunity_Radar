@@ -32,6 +32,10 @@ const digestProfileContextMigrationPath = new URL(
   "../prisma/migrations/20260902193000_enforce_digest_profile_context/migration.sql",
   import.meta.url,
 );
+const processingJobsMigrationPath = new URL(
+  "../prisma/migrations/20260902210000_add_processing_jobs/migration.sql",
+  import.meta.url,
+);
 
 describe("development seed contract", () => {
   it("contains ten sources and one hundred uniquely attributable raw items", () => {
@@ -128,5 +132,16 @@ describe("initial migration contract", () => {
     expect(migration).toContain(
       'FOREIGN KEY ("user_profile_id", "user_profile_revision", "user_id")',
     );
+  });
+
+  it("enforces durable job identity, overlap, lease, and attempt bounds", async () => {
+    const migration = await readFile(processingJobsMigrationPath, "utf8");
+
+    expect(migration).toContain('CREATE TABLE "processing_jobs"');
+    expect(migration).toContain('CONSTRAINT "processing_jobs_attempts_check"');
+    expect(migration).toContain('CONSTRAINT "processing_jobs_state_check"');
+    expect(migration).toContain('"processing_jobs_identity_key"');
+    expect(migration).toContain('"processing_jobs_active_concurrency_key"');
+    expect(migration).toContain("WHERE \"status\" IN ('SCHEDULED', 'RUNNING')");
   });
 });

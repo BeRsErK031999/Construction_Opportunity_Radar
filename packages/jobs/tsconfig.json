@@ -2,14 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "outDir": "dist",
     "rootDir": "src",
+    "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../application" },
-    { "path": "../core" },
-    { "path": "../jobs" }
-  ]
+  "include": ["src/**/*.ts"]
 }

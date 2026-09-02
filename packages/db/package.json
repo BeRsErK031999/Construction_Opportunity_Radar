@@ -23,6 +23,7 @@
     "@prisma/client": "7.10.0",
     "@radar/application": "workspace:*",
     "@radar/core": "workspace:*",
+    "@radar/jobs": "workspace:*",
     "pg": "8.23.0"
   },
   "devDependencies": {

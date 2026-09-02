@@ -113,6 +113,21 @@ importers:
         specifier: workspace:*
         version: link:../../packages/adapters/sources
 
+  apps/worker:
+    dependencies:
+      '@radar/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@radar/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@radar/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
+      '@radar/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+
   packages/adapters/ai:
     dependencies:
       '@radar/application':
@@ -189,6 +204,9 @@ importers:
       '@radar/core':
         specifier: workspace:*
         version: link:../core
+      '@radar/jobs':
+        specifier: workspace:*
+        version: link:../jobs
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -214,6 +232,8 @@ importers:
       prisma:
         specifier: npm:@prisma/prisma7@7.10.0
         version: '@prisma/prisma7@7.10.0(@types/node@24.13.3)(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)'
+
+  packages/jobs: {}
 
   packages/observability:
     dependencies:
