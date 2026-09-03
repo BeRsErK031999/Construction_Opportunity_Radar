@@ -14,6 +14,7 @@ import { type NormalizedItem } from "../normalization/normalized-item.js";
 import { isAiProcessingPermitted, type Source } from "../source/source.js";
 
 export const CLASSIFIER_VERSION_V1 = "classifier-v1";
+export const CLASSIFIER_VERSION_V2 = "classifier-v2";
 export const SIGNAL_TAXONOMY_VERSION_V1 = "signal-taxonomy-v1";
 
 export const SIGNAL_CATEGORIES_V1 = [
@@ -107,13 +108,23 @@ interface TextRule {
   readonly pattern: RegExp;
 }
 
-const CONSTRUCTION_RULES: readonly TextRule[] = Object.freeze([
+const CONSTRUCTION_RULES_V1: readonly TextRule[] = Object.freeze([
   { id: "vertical.construction.build", pattern: /строительств\p{L}*/iu },
   { id: "vertical.construction.installation", pattern: /строительно-монтажн\p{L}*/iu },
   { id: "vertical.construction.reconstruction", pattern: /реконструкц\p{L}*/iu },
   { id: "vertical.construction.repair", pattern: /капитальн\p{L}*\s+ремонт\p{L}*/iu },
   { id: "vertical.construction.contractor", pattern: /подрядчик\p{L}*/iu },
   { id: "vertical.construction.material", pattern: /стройматериал\p{L}*/iu },
+]);
+
+const COMPLETED_CONSTRUCTION_PATTERN = /(?:построен|возвед[её]н|введ[её]н|сдан)\p{L}*/iu;
+
+const CONSTRUCTION_RULES_V2: readonly TextRule[] = Object.freeze([
+  ...CONSTRUCTION_RULES_V1,
+  {
+    id: "vertical.construction.completed-build",
+    pattern: COMPLETED_CONSTRUCTION_PATTERN,
+  },
 ]);
 
 const HORECA_RULES: readonly TextRule[] = Object.freeze([
@@ -124,7 +135,7 @@ const HORECA_RULES: readonly TextRule[] = Object.freeze([
   { id: "vertical.horeca.hospitality", pattern: /гостеприимств\p{L}*/iu },
 ]);
 
-const OPPORTUNITY_RULES: readonly TextRule[] = Object.freeze([
+const OPPORTUNITY_RULES_V1: readonly TextRule[] = Object.freeze([
   { id: "opportunity.tender", pattern: /тендер\p{L}*/iu },
   { id: "opportunity.procurement", pattern: /закуп\p{L}*/iu },
   { id: "opportunity.applications", pattern: /при[её]м\s+заявок/iu },
@@ -135,6 +146,14 @@ const OPPORTUNITY_RULES: readonly TextRule[] = Object.freeze([
   { id: "opportunity.construction", pattern: /строительств\p{L}*/iu },
   { id: "opportunity.reconstruction", pattern: /реконструкц\p{L}*/iu },
   { id: "opportunity.budget", pattern: /бюджет\p{L}*/iu },
+]);
+
+const OPPORTUNITY_RULES_V2: readonly TextRule[] = Object.freeze([
+  ...OPPORTUNITY_RULES_V1,
+  {
+    id: "opportunity.completed-build",
+    pattern: COMPLETED_CONSTRUCTION_PATTERN,
+  },
 ]);
 
 const ADVERTISEMENT_RULES: readonly TextRule[] = Object.freeze([
@@ -271,9 +290,18 @@ const aiInputEvidence = (evidence: readonly ClassificationEvidence[]): readonly 
     ),
   );
 
-export const classifyCandidateV1 = (candidate: ClassificationCandidate): ClassificationDecision => {
+interface ClassifierPolicy {
+  readonly constructionRules: readonly TextRule[];
+  readonly opportunityRules: readonly TextRule[];
+  readonly version: string;
+}
+
+const classifyCandidate = (
+  candidate: ClassificationCandidate,
+  policy: ClassifierPolicy,
+): ClassificationDecision => {
   const deduplicatorVersion = version(candidate.deduplicatorVersion, "deduplicatorVersion");
-  const classifierVersion = version(CLASSIFIER_VERSION_V1, "classifierVersion");
+  const classifierVersion = version(policy.version, "classifierVersion");
   const taxonomyVersion = version(SIGNAL_TAXONOMY_VERSION_V1, "taxonomyVersion");
   assertInvariant(
     candidate.evidence.length > 0,
@@ -321,9 +349,9 @@ export const classifyCandidateV1 = (candidate: ClassificationCandidate): Classif
   const text = [selected.normalizedItem.title, selected.normalizedItem.text]
     .filter((value): value is string => value !== null)
     .join("\n");
-  const constructionRuleIds = matchRules(text, CONSTRUCTION_RULES);
+  const constructionRuleIds = matchRules(text, policy.constructionRules);
   const horecaRuleIds = matchRules(text, HORECA_RULES);
-  const opportunityRuleIds = matchRules(text, OPPORTUNITY_RULES);
+  const opportunityRuleIds = matchRules(text, policy.opportunityRules);
   const advertisementRuleIds = matchRules(text, ADVERTISEMENT_RULES);
   const explicitIrrelevanceRuleIds = matchRules(text, EXPLICIT_IRRELEVANCE_RULES);
   const scores = verticalScores(selected.source, constructionRuleIds, horecaRuleIds);
@@ -403,7 +431,21 @@ export const classifyCandidateV1 = (candidate: ClassificationCandidate): Classif
   );
 };
 
-export const classificationSignalIdV1 = (decision: AiEligibleClassificationDecision): SignalId => {
+export const classifyCandidateV1 = (candidate: ClassificationCandidate): ClassificationDecision =>
+  classifyCandidate(candidate, {
+    constructionRules: CONSTRUCTION_RULES_V1,
+    opportunityRules: OPPORTUNITY_RULES_V1,
+    version: CLASSIFIER_VERSION_V1,
+  });
+
+export const classifyCandidateV2 = (candidate: ClassificationCandidate): ClassificationDecision =>
+  classifyCandidate(candidate, {
+    constructionRules: CONSTRUCTION_RULES_V2,
+    opportunityRules: OPPORTUNITY_RULES_V2,
+    version: CLASSIFIER_VERSION_V2,
+  });
+
+export const classificationSignalId = (decision: AiEligibleClassificationDecision): SignalId => {
   const digest = createHash("sha256")
     .update(
       JSON.stringify([
@@ -422,3 +464,6 @@ export const classificationSignalIdV1 = (decision: AiEligibleClassificationDecis
     `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`,
   );
 };
+
+export const classificationSignalIdV1 = classificationSignalId;
+export const classificationSignalIdV2 = classificationSignalId;

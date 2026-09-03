@@ -48,6 +48,7 @@ import {
   normalizeRawItemV1,
   normalizedItemId,
   rawItemId,
+  SCORING_VERSION_V2,
   SIGNAL_TAXONOMY_VERSION_V1,
   sourceId,
   userId,
@@ -767,7 +768,10 @@ describe("PostgreSQL persistence", () => {
     if (constructionRegistration === undefined) {
       throw new Error("Construction profile fixture is required");
     }
-    const opportunityRepository = new PrismaSignalOpportunityRepository(client);
+    const opportunityRepository = new PrismaSignalOpportunityRepository(client, {
+      classifierVersion: CLASSIFIER_VERSION_V1,
+      scoringVersion: SCORING_VERSION_V2,
+    });
     const opportunities = await listSignalOpportunities({
       callerUserId: constructionRegistration.user.id,
       filter: {
@@ -792,6 +796,14 @@ describe("PostgreSQL persistence", () => {
         firstOpportunity.signal.id,
       ),
     ).toMatchObject({ signal: { id: firstOpportunity.signal.id } });
+    expect(
+      (
+        await new PrismaSignalOpportunityRepository(client, {
+          classifierVersion: "classifier-not-active",
+          scoringVersion: SCORING_VERSION_V2,
+        }).listForUser(constructionRegistration.user.id, { limit: 2 })
+      ).items,
+    ).toEqual([]);
 
     const digestRepository = new PrismaDigestRepository(client);
     const dailyDigest = await buildDigest({

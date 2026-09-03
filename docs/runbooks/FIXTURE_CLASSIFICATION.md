@@ -2,7 +2,7 @@
 
 ## Назначение
 
-`classifier-v1` — дешёвый детерминированный фильтр между `deduplicator-v1` и будущим `AIProvider`. Он не использует fixture labels и не вызывает AI. Вертикали и категории зафиксированы в `signal-taxonomy-v1`; изменение словарей, весов или исходов требует новой версии classifier/taxonomy.
+`classifier-v2` — активный дешёвый детерминированный фильтр между `deduplicator-v1` и `AIProvider`. Он не использует fixture labels и не вызывает AI. V2 сохраняет поведение v1 и добавляет распознавание русских форм завершённого строительства (`построен*`, `возведён*`, `введён*`, `сдан*`) с отдельными rule IDs. `classifier-v1` остаётся неизменным для исторической воспроизводимости. Категории не менялись, поэтому используется `signal-taxonomy-v1`.
 
 ## Порядок решения
 
@@ -12,6 +12,7 @@
 4. Source hint и текстовые словари дают детерминированные Construction/HoReCa scores. Равенство или отсутствие поддерживаемой вертикали дают `OTHER`.
 5. Реклама, явно отрицательное сообщение, `OTHER` и материал без opportunity cue получают `IRRELEVANT` с reason/rule IDs.
 6. Только `AI_ELIGIBLE` создаёт `CANDIDATE` signal. В signal сохраняются версии dedup/classifier/taxonomy, представитель кластера, rule IDs и только permitted provenance links.
+7. Текущие API/bot read models выбирают только активную пару `classifier-v2` + `opportunity-score-v2`, поэтому исторические v1-рекомендации не смешиваются с текущим ranking.
 
 Этот порядок не меняет raw/normalized evidence. Полный состав кластера остаётся в `deduplication_assignments`, даже если отдельный member не разрешён для AI.
 
@@ -37,7 +38,8 @@ pnpm fixtures:classify
 
 ## Ограничения
 
-- Это baseline для recall/precision измерений, а не обещание продуктового качества; gold-set и benchmark относятся к ART-019/020.
+- Это baseline для recall/precision измерений, а не обещание продуктового качества; manual/live review продолжает быть обязательным для Gate G3.
 - Rule score определяет pre-AI relevance и не является персональным Opportunity Score из ART-010.
 - Запрещённые evidence links не передаются AI. Перевод источника в разрешённое состояние требует нового versioned classification run, а не скрытого изменения старого signal.
-- Gate G2 этим прогоном не закрыт: остаются AI contract/provider, полный orchestrator, durable jobs и restart evidence.
+- Сам fixture-прогон не закрывает Gate G2: для gate по-прежнему нужны измеренные live uptime, JSON success, duplicate rate и restart/recovery evidence.
+- Переход v1 → v2 и pilot evidence описаны в [ADR-0007](../adr/0007-pilot-derived-confidence-guardrail.md).

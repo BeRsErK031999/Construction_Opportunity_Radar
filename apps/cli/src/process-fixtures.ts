@@ -7,8 +7,8 @@ import {
 import { FakeAIProvider } from "@radar/ai-adapters";
 import { AI_ANALYSIS_SCHEMA_VERSION_V1 } from "@radar/contracts";
 import {
-  CLASSIFIER_VERSION_V1,
-  classifyCandidateV1,
+  CLASSIFIER_VERSION_V2,
+  classifyCandidateV2,
   createUser,
   createUserProfile,
   DEDUPLICATOR_VERSION_V1,
@@ -59,9 +59,9 @@ const deduplicator: Deduplicator = Object.freeze({
   version: DEDUPLICATOR_VERSION_V1,
 });
 const classifier: Classifier = Object.freeze({
-  classify: classifyCandidateV1,
+  classify: classifyCandidateV2,
   taxonomyVersion: SIGNAL_TAXONOMY_VERSION_V1,
-  version: CLASSIFIER_VERSION_V1,
+  version: CLASSIFIER_VERSION_V2,
 });
 
 const profiles = Object.freeze([

@@ -75,6 +75,7 @@ Operationally, the closed MVP has 20-50 target users, two cohorts, a baseline KP
 
 - deterministic factors tested;
 - score breakdown persisted and explainable;
+- effective confidence reconciles model confidence with fact-source reliability;
 - threshold or weight change supported by pilot/eval evidence;
 - previous version remains identifiable.
 

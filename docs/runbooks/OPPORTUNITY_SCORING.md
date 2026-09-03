@@ -1,8 +1,8 @@
-# Opportunity scoring v1
+# Opportunity scoring v2
 
 ## Контракт
 
-`opportunity-score-v1` — чистая детерминированная политика. Она не вызывает AI, не читает environment и не меняет веса по содержимому сигнала. Глобальный `Signal` не содержит `companyFit` или итоговый Opportunity Score: результат относится к конкретной ревизии `UserProfile` и сохраняется в `Recommendation`.
+`opportunity-score-v2` — активная чистая детерминированная политика. Она не вызывает AI, не читает environment и не меняет веса по содержимому сигнала. Глобальный `Signal` не содержит `companyFit` или итоговый Opportunity Score: результат относится к конкретной ревизии `UserProfile` и сохраняется в `Recommendation`. Исходная v1 остаётся доступной только для воспроизведения исторических решений.
 
 Формула:
 
@@ -26,6 +26,26 @@ Bands используют включительную нижнюю границ�
 | `HIGH` | `70..<85` |
 | `CRITICAL` | `85..100` |
 
+## Confidence guardrail v2
+
+Модельная confidence не может быть выше надёжности supporting evidence. Для каждого fact берётся максимальная reliability среди цитируемых им источников, затем минимум по всем facts. Это означает: каждый опубликованный факт должен иметь хотя бы один достаточно надёжный источник.
+
+```text
+evidenceReliability = min(max(source reliability for each fact))
+effectiveConfidence = min(Analysis.confidence * 100, evidenceReliability)
+```
+
+Именно `effectiveConfidence` сохраняется в `Recommendation.scoreBreakdown.confidence` и участвует в пятифакторной формуле. После вычисления raw weighted score применяется верхняя граница приоритета:
+
+| Effective confidence | Максимальный total | Максимальный band |
+| ---: | ---: | --- |
+| `< 40` | `54` | `LOW` |
+| `40..<60` | `69` | `MEDIUM` |
+| `60..<80` | `84` | `HIGH` |
+| `80..100` | `100` | `CRITICAL` |
+
+Explanation сохраняет исходную model confidence, evidence reliability, effective confidence, raw weighted score и применённый cap. Весовая формула и исходные band thresholds не менялись; guardrail является отдельным versioned правилом v2.
+
 ## Company Fit v1
 
 | Критерий | Вес | Match | Mismatch | Unknown |
@@ -38,18 +58,18 @@ Bands используют включительную нижнюю границ�
 
 Сравнение регистра и `ё/е` нормализуется. Для offering terms допускается прозрачное substring/prefix-сопоставление; результат содержит matched values и reason code каждого критерия.
 
-`ignoredEventTypes` и `excludedKeywords` — явные отрицательные предпочтения. Их совпадение возвращает `EXCLUDED` без total score и band; такой результат нельзя передать в `createRecommendationFromScoreV1`.
+`ignoredEventTypes` и `excludedKeywords` — явные отрицательные предпочтения. Их совпадение возвращает `EXCLUDED` без total score и band; такой результат нельзя передать в `createRecommendationFromScoreV2`.
 
 ## Проверка
 
 ```powershell
-pnpm exec vitest run packages/core/test/scoring-v1.test.ts
+pnpm exec vitest run packages/core/test/scoring-v1.test.ts packages/core/test/scoring-v2.test.ts
 pnpm typecheck
 pnpm lint
 ```
 
-Тесты фиксируют веса, арифметику, каждую границу band, invalid/NaN inputs, confidence conversion, match/mismatch/unknown, разные результаты одного opportunity для двух профилей, exclusions, signal-analysis identity и mapping результата в Recommendation.
+Тесты фиксируют веса, арифметику, каждую границу band, invalid/NaN inputs, confidence conversion, source/fact reliability, каждый confidence cap, match/mismatch/unknown, разные результаты одного opportunity для двух профилей, exclusions, signal-analysis identity и mapping результата в Recommendation.
 
 ## Изменение политики
 
-Текущие weights и thresholds — baseline до pilot/eval calibration. Любое изменение требует измеримого основания, новой версии и сравнения с предыдущей; LLM не может менять их автоматически. Полный application/persistence flow появится в ART-013 после versioned AI contract.
+Текущие weights, thresholds и confidence caps — baseline до следующей pilot/eval calibration. Любое изменение требует измеримого основания, новой версии и сравнения с предыдущей; LLM не может менять их автоматически. Основание перехода v1 → v2 зафиксировано в [ADR-0007](../adr/0007-pilot-derived-confidence-guardrail.md).

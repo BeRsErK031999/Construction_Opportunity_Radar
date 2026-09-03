@@ -1,7 +1,7 @@
 import { executeClassification, type Classifier } from "@radar/application";
 import {
-  CLASSIFIER_VERSION_V1,
-  classifyCandidateV1,
+  CLASSIFIER_VERSION_V2,
+  classifyCandidateV2,
   DEDUPLICATOR_VERSION_V1,
   SIGNAL_TAXONOMY_VERSION_V1,
 } from "@radar/core";
@@ -10,9 +10,9 @@ import { createDatabaseClient, PrismaClassificationRepository } from "@radar/db"
 import { databaseUrl } from "./database-url.js";
 
 const classifier: Classifier = Object.freeze({
-  classify: classifyCandidateV1,
+  classify: classifyCandidateV2,
   taxonomyVersion: SIGNAL_TAXONOMY_VERSION_V1,
-  version: CLASSIFIER_VERSION_V1,
+  version: CLASSIFIER_VERSION_V2,
 });
 
 const main = async (): Promise<void> => {

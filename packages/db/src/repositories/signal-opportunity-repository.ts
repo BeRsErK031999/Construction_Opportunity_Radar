@@ -55,7 +55,16 @@ export const signalOpportunityFromRecord = (record: SignalOpportunityRecord): Si
   });
 };
 
-const signalWhere = (filter: SignalListFilter): Prisma.SignalWhereInput => ({
+export interface ActiveOpportunityPolicyVersions {
+  readonly classifierVersion: string;
+  readonly scoringVersion: string;
+}
+
+const signalWhere = (
+  filter: SignalListFilter,
+  policy: ActiveOpportunityPolicyVersions | null,
+): Prisma.SignalWhereInput => ({
+  ...(policy === null ? {} : { classifierVersion: policy.classifierVersion }),
   ...(filter.category === undefined ? {} : { category: filter.category }),
   ...(filter.dateFrom === undefined && filter.dateTo === undefined
     ? {}
@@ -73,9 +82,11 @@ export class PrismaSignalOpportunityRepository
   implements SavedOpportunityRepository, SignalOpportunityRepository
 {
   readonly #client: DatabaseClient;
+  readonly #policy: ActiveOpportunityPolicyVersions | null;
 
-  constructor(client: DatabaseClient) {
+  constructor(client: DatabaseClient, policy: ActiveOpportunityPolicyVersions | null = null) {
     this.#client = client;
+    this.#policy = policy;
   }
 
   async #latestProfile(
@@ -97,7 +108,9 @@ export class PrismaSignalOpportunityRepository
       include: signalOpportunityInclude,
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       where: {
+        ...(this.#policy === null ? {} : { scoringVersion: this.#policy.scoringVersion }),
         signalId,
+        signal: signalWhere({ limit: 1 }, this.#policy),
         userProfileId: profile.id,
         userProfileRevision: profile.revision,
       },
@@ -117,7 +130,8 @@ export class PrismaSignalOpportunityRepository
       take: filter.limit + 1,
       where: {
         ...(filter.minimumScore === undefined ? {} : { totalScore: { gte: filter.minimumScore } }),
-        signal: signalWhere(filter),
+        ...(this.#policy === null ? {} : { scoringVersion: this.#policy.scoringVersion }),
+        signal: signalWhere(filter, this.#policy),
         userProfileId: profile.id,
         userProfileRevision: profile.revision,
       },

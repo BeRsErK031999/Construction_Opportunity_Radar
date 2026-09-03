@@ -3,11 +3,11 @@ import { createHash } from "node:crypto";
 import {
   analysisId,
   correlationId,
-  createRecommendationFromScoreV1,
+  createRecommendationFromScoreV2,
   normalizedItemId,
   rawItemId,
   recommendationId,
-  scoreAnalyzedSignalForProfileV1,
+  scoreAnalyzedSignalForProfileV2,
   type Analysis,
   type ClassificationCandidate,
   type NormalizedItem,
@@ -434,7 +434,7 @@ const runOfflinePipeline = async (
         continue;
       }
       eligiblePairs += 1;
-      const score = scoreAnalyzedSignalForProfileV1({
+      const score = scoreAnalyzedSignalForProfileV2({
         analysis: analyzed.analysis,
         companyFitContext: {
           regions: [
@@ -447,13 +447,14 @@ const runOfflinePipeline = async (
         },
         profile: registration.profile,
         signal: analyzed.candidate.signal,
+        sources: analyzed.candidate.evidence.map(({ source }) => source),
       });
       if (score.status === "EXCLUDED") {
         excluded += 1;
         continue;
       }
       scored += 1;
-      const recommendation = createRecommendationFromScoreV1({
+      const recommendation = createRecommendationFromScoreV2({
         analysisId: analyzed.analysis.id,
         correlationId: analyzed.analysis.correlationId,
         createdAt: input.runAt,

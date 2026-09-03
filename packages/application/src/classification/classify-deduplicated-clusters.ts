@@ -1,5 +1,5 @@
 import {
-  classificationSignalIdV1,
+  classificationSignalId,
   createSignal,
   isAiProcessingPermitted,
   type AiEligibleClassificationDecision,
@@ -142,7 +142,7 @@ const toPersistableSignal = (
       createdAt,
       deduplicationRepresentativeNormalizedItemId: decision.representativeNormalizedItemId,
       deduplicatorVersion: decision.deduplicatorVersion,
-      id: classificationSignalIdV1(decision),
+      id: classificationSignalId(decision),
       normalizedItemIds: decision.aiInputEvidence.map((evidence) => evidence.normalizedItemId),
       relevanceScore: decision.relevanceScore,
       sourceIds,

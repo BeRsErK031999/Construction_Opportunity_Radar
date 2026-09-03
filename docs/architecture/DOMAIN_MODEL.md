@@ -50,7 +50,7 @@ Source
 | `DigestDelivery`    | Попытка доставить один Digest пользователю                     | User обязан совпадать с владельцем Digest; один outcome на channel/digest; `PENDING`, `SENT`, `FAILED` имеют ту же взаимоисключающую форму, что карточка; terminal outcome неизменяем.                                                                                                                                                               |
 | `Feedback`          | Одно attributable действие пользователя                        | Только `USEFUL`, `NOT_USEFUL`, `SAVED`, `ACTED`, `ALREADY_KNOWN`; всегда есть user/recommendation/correlation, delivery и reason опциональны; повторы определяются по user/recommendation/action, а `USEFUL` и `NOT_USEFUL` взаимоисключаются.                                                                                                    |
 
-`Analysis.confidence` — вероятность `0..1` из structured AI contract. `opportunity-score-v1` явно преобразует её в `Recommendation.scoreBreakdown.confidence` диапазона `0..100`; модель не управляет весами, thresholds или арифметикой.
+`Analysis.confidence` — вероятность `0..1` из structured AI contract. Активный `opportunity-score-v2` преобразует её в `0..100`, ограничивает надёжностью supporting fact sources и сохраняет effective confidence в `Recommendation.scoreBreakdown.confidence`. Confidence guardrail ограничивает максимально возможный total/band; модель не управляет весами, thresholds или cap. Исторический `opportunity-score-v1` остаётся воспроизводимым.
 
 ## Persistence mapping для ART-004
 

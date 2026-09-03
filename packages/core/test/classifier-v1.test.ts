@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   CLASSIFIER_VERSION_V1,
+  CLASSIFIER_VERSION_V2,
   classificationSignalIdV1,
   classifyCandidateV1,
+  classifyCandidateV2,
   correlationId,
   createNormalizedItem,
   createSource,
@@ -259,5 +261,36 @@ describe("classifier-v1", () => {
     expect(() =>
       classifyCandidateV1(candidate([item], normalizedItemId("missing-representative"))),
     ).toThrow(expect.objectContaining({ code: "MISSING_CLASSIFICATION_REPRESENTATIVE" }));
+  });
+});
+
+describe("classifier-v2", () => {
+  it("recognizes completed construction expressed with Russian verb forms", () => {
+    const input = candidate([
+      evidence({
+        id: "completed-construction",
+        text: [
+          "Ко Дню строителя.",
+          "В области построены четыре школы и детский сад.",
+          "Введён многофункциональный спортивный комплекс, сданы новые поликлиники.",
+        ].join(" "),
+        verticals: ["CONSTRUCTION", "HORECA"],
+      }),
+    ]);
+
+    expect(classifyCandidateV1(input)).toMatchObject({
+      outcome: "IRRELEVANT",
+      reasonCode: "UNSUPPORTED_OR_AMBIGUOUS_VERTICAL",
+    });
+    const decision = classifyCandidateV2(input);
+    expect(decision).toMatchObject({
+      category: "CONSTRUCTION_PROJECT",
+      classifierVersion: CLASSIFIER_VERSION_V2,
+      outcome: "AI_ELIGIBLE",
+      reasonCode: "RELEVANT_OPPORTUNITY",
+      vertical: "CONSTRUCTION",
+    });
+    expect(decision.matchedRuleIds).toContain("vertical.construction.completed-build");
+    expect(decision.matchedRuleIds).toContain("opportunity.completed-build");
   });
 });

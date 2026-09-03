@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { loadBotConfig } from "@radar/config";
+import { CLASSIFIER_VERSION_V2, SCORING_VERSION_V2 } from "@radar/core";
 import {
   createDatabaseClient,
   PrismaDeliveryRepository,
@@ -34,7 +35,10 @@ export const runBot = async (): Promise<void> => {
   const client = createDatabaseClient(config.databaseUrl);
   const telemetry = createOperationalTelemetry({ logger });
   const profiles = new PrismaProfileRegistrationRepository(client);
-  const signals = new PrismaSignalOpportunityRepository(client);
+  const signals = new PrismaSignalOpportunityRepository(client, {
+    classifierVersion: CLASSIFIER_VERSION_V2,
+    scoringVersion: SCORING_VERSION_V2,
+  });
   const botReference: { current?: ReturnType<typeof buildRadarBot> } = {};
   const telegramClient: TelegramMessageClient = {
     async sendMessage(chatId, text, options) {

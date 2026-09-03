@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { loadApiConfig } from "@radar/config";
+import { CLASSIFIER_VERSION_V2, SCORING_VERSION_V2 } from "@radar/core";
 import {
   createDatabaseClient,
   PrismaFeedbackRepository,
@@ -37,7 +38,10 @@ export const runApi = async (): Promise<void> => {
       feedback,
       feedbackRead: feedback,
       profiles: new PrismaProfileRegistrationRepository(client),
-      signals: new PrismaSignalOpportunityRepository(client),
+      signals: new PrismaSignalOpportunityRepository(client, {
+        classifierVersion: CLASSIFIER_VERSION_V2,
+        scoringVersion: SCORING_VERSION_V2,
+      }),
       sources: new PrismaSourceRepository(client),
     },
   });
