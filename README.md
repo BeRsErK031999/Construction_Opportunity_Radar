@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-023` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry, security baseline и зашифрованный проверяемый backup/restore. `ART-024 CI` реализован локально; до статуса `DONE` нужен первый успешный GitHub Actions run.
+`ART-004`–`ART-024` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry, security baseline, зашифрованный проверяемый backup/restore и зелёный GitHub CI. Следующий critical-path пункт — `ART-025 Denis-PC/Ollama integration contract`.
 
 Первый продуктовый контур:
 
@@ -156,7 +156,7 @@ pnpm db:verify-backup
 
 ## Ближайший технический результат
 
-Запушить локально готовый `ART-024`, получить первый успешный `Quality` и `PostgreSQL integration` run, затем перейти к `ART-025 Denis-PC/Ollama integration contract`. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
+Реализовать локальную часть `ART-025 Denis-PC/Ollama integration contract`: bounded `OllamaAIProvider`, conditional config, health/security runbook и offline adapter tests. Реальный smoke и одинаковое сравнение 8B/14B остаются внешним evidence Gate G1.
 
 ## Источники планирования
 

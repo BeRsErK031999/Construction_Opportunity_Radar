@@ -61,4 +61,4 @@ Run `pnpm test:integration` for the default Testcontainers path. To reproduce th
 - dependency audit failure: assess exploitability and update the direct dependency or lockfile with tests;
 - integration failure: inspect migration output and service health before retrying; do not point the suite at a shared database.
 
-After the first remote run passes, configure `Quality` and `PostgreSQL integration` as required branch checks. Repository settings are an operator action and are not changed by the workflow itself.
+Remote evidence: GitHub Actions run `33722329752` on commit `7053f17` passed `Quality` and `PostgreSQL integration`. Configure both jobs as required branch checks. Repository settings are an operator action and are not changed by the workflow itself.
