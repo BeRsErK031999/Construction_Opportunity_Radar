@@ -5,6 +5,19 @@ export {
 } from "./ai-analysis-v1.js";
 export * from "./api-v1.js";
 export {
+  EVAL_ANNOTATION_POLICY_VERSION_V1,
+  EVAL_EXPECTED_ACTION_KINDS,
+  EVAL_GOLD_SCHEMA_VERSION_V1,
+  EVAL_SPLITS,
+  EvalGoldDatasetV1Schema,
+  EvalGoldExpectedActionV1Schema,
+  EvalGoldFactV1Schema,
+  EvalGoldItemV1Schema,
+  EvalGoldLabelsV1Schema,
+  type EvalGoldDatasetV1,
+  type EvalGoldItemV1,
+} from "./eval-gold-v1.js";
+export {
   FixtureIngestionDatasetV1Schema,
   FixtureItemLabelsV1Schema,
   FixtureItemV1Schema,

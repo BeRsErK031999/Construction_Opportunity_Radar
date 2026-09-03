@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-018` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest и durable job runtime. Scheduler/worker поддерживает семь pipeline/digest job-типов, atomic claim, no-overlap, bounded retry и restart recovery. Следующий critical-path пункт — `ART-019 Eval dataset`.
+`ART-004`–`ART-019` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime и отдельный 200-item eval gold set. Следующий critical-path пункт — `ART-020 AI benchmark harness`.
 
 Первый продуктовый контур:
 
@@ -34,8 +34,9 @@
 15. [docs/runbooks/FEEDBACK_LOOP.md](docs/runbooks/FEEDBACK_LOOP.md) — пять outcomes, idempotency, определения метрик и rollback constraint.
 16. [docs/runbooks/DIGEST.md](docs/runbooks/DIGEST.md) — daily/weekly periods, top-5, weekly metrics, idempotency и recovery.
 17. [docs/runbooks/DURABLE_JOBS.md](docs/runbooks/DURABLE_JOBS.md) — job states, scheduler windows, claim/lease/retry/recovery и операционная диагностика.
-18. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-19. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+18. [docs/runbooks/EVAL_GOLD_SET.md](docs/runbooks/EVAL_GOLD_SET.md) — контракт, provenance, splits и проверки отдельного gold set.
+19. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+20. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -91,6 +92,15 @@ pnpm process:fixtures
 
 Первые четыре команды позволяют запускать стадии отдельно. `process:fixtures` выполняет весь контур одной командой. На проверенном корпусе результат стабилен: 200 raw, 200 normalized, 150 кластеров, 110 разрешённых signals, 110 успешных fake analyses и 110 рекомендаций для двух fixture-профилей. Повторный полный запуск создаёт 0 строк и делает 0 provider calls. Подробности — в [runbook полного офлайн-конвейера](docs/runbooks/FULL_OFFLINE_PIPELINE.md).
 
+Отдельный `eval-gold/v1` содержит 200 project-authored synthetic материалов: по 100 Construction и HoReCa, 160 relevant и 40 negative, с дословной evidence-привязкой facts. Набор не является operational storage и не пересекается исходными текстами с ingestion fixtures:
+
+```powershell
+pnpm evals:generate
+pnpm evals:validate
+```
+
+Правила splits и ограничения технической baseline-разметки описаны в [eval runbook](docs/runbooks/EVAL_GOLD_SET.md).
+
 ## Telegram UI
 
 Бот запускается отдельным процессом и требует мигрированную PostgreSQL, заранее зарегистрированный Telegram user ID и локальный `TELEGRAM_BOT_TOKEN`:
@@ -116,7 +126,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-019`: отделить от ingestion fixtures размеченный gold set из 200 Construction/HoReCa материалов с relevance, event type, фактами, ожидаемым действием и importance для воспроизводимого AI benchmark.
+Реализовать `ART-020`: добавить `benchmark:ai` для одинакового прогона provider/model по `eval-gold/v1` с JSON validity, classification, factual errors, p50/p95 latency, tokens и failures. Внешнее сравнение 8B/14B остаётся отдельным evidence.
 
 ## Источники планирования
 

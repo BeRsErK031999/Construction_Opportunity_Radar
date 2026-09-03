@@ -13,6 +13,7 @@
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/db" },
+    { "path": "../../packages/evals" },
     { "path": "../../packages/adapters/sources" }
   ]
 }

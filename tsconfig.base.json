@@ -27,6 +27,7 @@
       "@radar/core": ["packages/core/src/index.ts"],
       "@radar/db": ["packages/db/src/index.ts"],
       "@radar/delivery-adapters": ["packages/adapters/delivery/src/index.ts"],
+      "@radar/evals": ["packages/evals/src/index.ts"],
       "@radar/jobs": ["packages/jobs/src/index.ts"],
       "@radar/observability": ["packages/observability/src/index.ts"],
       "@radar/source-adapters": ["packages/adapters/sources/src/index.ts"]

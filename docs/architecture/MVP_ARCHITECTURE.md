@@ -160,6 +160,8 @@ Provider failures use stable codes for invalid/oversized input, timeout, unavail
 
 `ART-012` implements the transport boundary as strict `ai-analysis/v1`. `AIAnalysisResponseV1Schema` rejects unknown fields, surrounding-whitespace repair, invalid score/confidence ranges, oversized collections/text, fewer than two or more than five actions, duplicate identifiers, inference bases outside the response, and a declared source set that differs from fact provenance. `analysisFromAIResponseV1` then compares analysis/signal/correlation identity, provider/model and all versions/timestamps to the request, and rejects source IDs outside its permission-checked evidence. Only after both layers pass are string IDs converted to branded domain IDs. Any schema, identity, provenance, or final domain failure becomes a safe non-retryable failed Analysis with `AI_INVALID_RESPONSE`; untrusted output is never copied into the failure reason.
 
+`ART-019` keeps AI evaluation outside the operational ingestion path. `fixtures/evals/v1` is a Git-versioned, project-authored synthetic technical baseline; `packages/evals` loads it through the strict `eval-gold/v1` contract. The contract enforces the 100/100 vertical balance, relevance and split counts, action/category consistency, and a verbatim source fragment for every expected fact. Calibration data may support prompt work; holdout data is reserved for final runs. Neither split is inserted into PostgreSQL or presented as live-source or human-adjudicated evidence.
+
 The versioned `SignalAnalysis` contract includes at least:
 
 ```text

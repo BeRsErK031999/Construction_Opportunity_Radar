@@ -9,6 +9,7 @@
     "@radar/contracts": "workspace:*",
     "@radar/core": "workspace:*",
     "@radar/db": "workspace:*",
+    "@radar/evals": "workspace:*",
     "@radar/source-adapters": "workspace:*"
   }
 }

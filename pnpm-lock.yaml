@@ -109,6 +109,9 @@ importers:
       '@radar/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@radar/evals':
+        specifier: workspace:*
+        version: link:../../packages/evals
       '@radar/source-adapters':
         specifier: workspace:*
         version: link:../../packages/adapters/sources
@@ -232,6 +235,12 @@ importers:
       prisma:
         specifier: npm:@prisma/prisma7@7.10.0
         version: '@prisma/prisma7@7.10.0(@types/node@24.13.3)(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)'
+
+  packages/evals:
+    dependencies:
+      '@radar/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/jobs: {}
 
