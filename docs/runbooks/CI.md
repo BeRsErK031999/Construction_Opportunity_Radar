@@ -21,6 +21,8 @@ Workflow permissions are limited to `contents: read`. The automatic read-only `G
 
 Reusable actions and the PostgreSQL image are pinned to immutable commits/digest. Updating a pin requires reviewing the upstream release and rerunning both jobs.
 
+The pnpm dependency-build policy is explicit in `pnpm-workspace.yaml`: Prisma and esbuild builds are allowed, while optional SSH/CPU native bindings and the nonessential protobuf diagnostic postinstall are denied. A newly introduced unreviewed dependency build must fail frozen install until its script and provenance are reviewed.
+
 ## Database safety boundary
 
 Local integration tests continue to start Testcontainers automatically. CI sets `INTEGRATION_DATABASE_URL` to reuse its service container. The test harness accepts that override only when all of these conditions hold:
