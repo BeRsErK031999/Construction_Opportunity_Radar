@@ -39,4 +39,25 @@ describe("createLogger", () => {
     expect(lines[0]).not.toContain("private-token");
     expect(lines[0]).not.toContain("postgresql://");
   });
+
+  it("sanitizes secrets embedded in nested error messages and stacks", () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      destination: { write: (message: string) => lines.push(message) },
+      level: "error",
+      service: "security-test",
+    });
+    const databaseSecret = "postgresql://owner:production-password@database/radar";
+    const bearerSecret = "Bearer a-production-token-that-must-never-be-logged";
+    const error = new Error(`Failed ${databaseSecret}; authorization=${bearerSecret}`);
+    Object.assign(error, { context: { client_secret: "nested-private-value" } });
+
+    logger.error({ err: error }, "sanitization check");
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toContain("production-password");
+    expect(lines[0]).not.toContain("a-production-token");
+    expect(lines[0]).not.toContain("nested-private-value");
+    expect(lines[0]).toContain(REDACTED_LOG_VALUE);
+  });
 });

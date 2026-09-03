@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-021` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report и единый operational telemetry contract. Следующий critical-path пункт — `ART-022 Security hardening`.
+`ART-004`–`ART-022` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry и security baseline. Следующий critical-path пункт — `ART-023 Backup and restore`.
 
 Первый продуктовый контур:
 
@@ -38,8 +38,10 @@
 19. [docs/runbooks/AI_BENCHMARK.md](docs/runbooks/AI_BENCHMARK.md) — запуск, метрики, label boundary и правила одинакового сравнения моделей.
 20. [docs/observability/README.md](docs/observability/README.md) — единый logging-контракт, process events и correlation context.
 21. [docs/runbooks/OBSERVABILITY.md](docs/runbooks/OBSERVABILITY.md) — counters, snapshot, cardinality и локальная диагностика.
-22. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-23. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+22. [docs/security/THREAT_MODEL.md](docs/security/THREAT_MODEL.md) — активы, trust boundaries, controls и остаточные security-риски.
+23. [docs/runbooks/SECURITY.md](docs/runbooks/SECURITY.md) — secret/dependency checks, scoped auth, runtime DB role, egress и rotation.
+24. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+25. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -61,7 +63,7 @@ pnpm dev
 Invoke-RestMethod http://127.0.0.1:3000/health
 ```
 
-Локальный `.env` необязателен для `/health`. Business endpoints требуют запущенную мигрированную PostgreSQL и `API_AUTH_TOKEN` длиной не менее 32 символов; доступные ключи перечислены без значений в `.env.example`. Telegram и Ollama для текущего API не нужны. Production-конфигурация дополнительно требует явный `DATABASE_URL` и разрешает только loopback bind до ART-022.
+Локальный `.env` необязателен для `/health`. User endpoints требуют `API_AUTH_TOKEN`, Source Registry — отдельный `API_ADMIN_AUTH_TOKEN`; production требует оба разных значения длиной не менее 32 символов, явный runtime `DATABASE_URL` и loopback bind. Request body/rate имеют typed bounds. Доступные ключи перечислены без значений в `.env.example`; Telegram и Ollama для API не нужны.
 
 Production-like запуск собранного JavaScript:
 
@@ -78,6 +80,7 @@ PostgreSQL публикуется только на `127.0.0.1:54329`. Перв�
 pnpm db:up
 pnpm db:migrate:deploy
 pnpm db:seed
+pnpm db:grant-runtime
 pnpm test:integration
 ```
 
@@ -133,11 +136,12 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm db:validate
+pnpm security:check
 ```
 
 ## Ближайший технический результат
 
-Реализовать `ART-022`: проверить threat baseline, secrets, least privilege, auth/rate limits, dependency exposure и log redaction перед production-like запуском. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
+Реализовать `ART-023`: добавить PostgreSQL backup/restore commands, ограниченное хранение и фактически проверить restore по runbook. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
 
 ## Источники планирования
 

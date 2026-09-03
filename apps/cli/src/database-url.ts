@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { loadEnvFile } from "node:process";
 
-const LOCAL_DATABASE_URL = "postgresql://radar:radar_local@127.0.0.1:54329/radar";
+const LOCAL_DATABASE_URL = "postgresql://radar_runtime:radar_runtime_local@127.0.0.1:54329/radar";
 const rootEnvironmentFile = resolve(process.cwd(), ".env");
 
 if (existsSync(rootEnvironmentFile)) {

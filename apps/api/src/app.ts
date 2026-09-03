@@ -50,7 +50,8 @@ import {
   type UserProfile,
 } from "@radar/core";
 import { type AppLogger } from "@radar/observability";
-import Fastify, { type FastifyRequest } from "fastify";
+import fastifyRateLimit from "@fastify/rate-limit";
+import Fastify, { LogController, type FastifyRequest } from "fastify";
 import { z } from "zod";
 
 export const API_VERSION = "0.1.0";
@@ -64,12 +65,16 @@ export interface ApiRepositories {
 }
 
 export interface BuildApiOptions {
+  readonly adminAuthToken?: string | null;
   readonly apiAuthToken?: string | null;
+  readonly bodyLimitBytes?: number;
   readonly idFactory?: () => string;
   readonly logger: AppLogger;
   readonly now?: () => Date;
   readonly onClose?: () => Promise<void>;
   readonly repositories?: ApiRepositories | null;
+  readonly rateLimitMax?: number;
+  readonly rateLimitWindowMs?: number;
   readonly uptime?: () => number;
   readonly version?: string;
 }
@@ -80,6 +85,8 @@ type ApiErrorCode =
   | "FORBIDDEN"
   | "INTERNAL_ERROR"
   | "NOT_FOUND"
+  | "PAYLOAD_TOO_LARGE"
+  | "RATE_LIMITED"
   | "UNAUTHORIZED"
   | "VALIDATION_ERROR";
 
@@ -108,18 +115,22 @@ const secureTokenMatch = (presented: string, expected: string): boolean =>
     createHash("sha256").update(expected).digest(),
   );
 
-const authenticate = (request: FastifyRequest, configuredToken: string | null): void => {
+const authenticate = (
+  request: FastifyRequest,
+  configuredToken: string | null,
+  scope: "admin" | "user",
+): void => {
   if (configuredToken === null) {
     throw new HttpApiError(
       503,
       "API_NOT_CONFIGURED",
-      "Business API requires API_AUTH_TOKEN configuration",
+      `Business API requires ${scope} authentication configuration`,
     );
   }
   const authorization = request.headers.authorization;
-  const presented = authorization?.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length)
-    : null;
+  const match =
+    typeof authorization === "string" ? /^Bearer ([!-~]{32,512})$/i.exec(authorization) : null;
+  const presented = match?.[1] ?? null;
   if (presented === null || !secureTokenMatch(presented, configuredToken)) {
     throw new HttpApiError(401, "UNAUTHORIZED", "Valid Bearer credentials are required");
   }
@@ -231,230 +242,295 @@ const zodError = (error: z.ZodError): HttpApiError =>
     error.issues.map((issue) => ({ message: issue.message, path: issue.path.join(".") })),
   );
 
+const errorStatusCode = (error: unknown): number | null => {
+  if (typeof error !== "object" || error === null || !("statusCode" in error)) {
+    return null;
+  }
+  const statusCode = error.statusCode;
+  return typeof statusCode === "number" ? statusCode : null;
+};
+
+const transportError = (error: unknown): HttpApiError | null => {
+  switch (errorStatusCode(error)) {
+    case 400:
+      return new HttpApiError(400, "VALIDATION_ERROR", "Request validation failed");
+    case 404:
+      return new HttpApiError(404, "NOT_FOUND", "Route not found");
+    case 413:
+      return new HttpApiError(413, "PAYLOAD_TOO_LARGE", "Request payload is too large");
+    case 429:
+      return new HttpApiError(429, "RATE_LIMITED", "Request rate limit exceeded");
+    default:
+      return null;
+  }
+};
+
 export const buildApi = (options: BuildApiOptions) => {
   const now = options.now ?? (() => new Date());
   const uptime = options.uptime ?? (() => process.uptime());
   const version = options.version ?? API_VERSION;
+  const configuredAdminToken = options.adminAuthToken ?? null;
   const configuredToken = options.apiAuthToken ?? null;
   const repositories = options.repositories ?? null;
   const idFactory = options.idFactory ?? randomUUID;
-  const app = Fastify({ loggerInstance: options.logger });
-
-  app.addHook("onSend", async (_request, reply) => {
-    void reply.header("x-radar-api-version", API_CONTRACT_VERSION_V1);
+  const app = Fastify({
+    bodyLimit: options.bodyLimitBytes ?? 65_536,
+    logController: new LogController({ disableRequestLogging: true }),
+    loggerInstance: options.logger,
+    trustProxy: false,
   });
-  if (options.onClose !== undefined) {
-    app.addHook("onClose", options.onClose);
-  }
+  void app.register(async (api) => {
+    await api.register(fastifyRateLimit, {
+      global: true,
+      ipv6Subnet: 64,
+      max: options.rateLimitMax ?? 60,
+      skipOnError: false,
+      timeWindow: options.rateLimitWindowMs ?? 60_000,
+    });
 
-  app.setErrorHandler((error, request, reply) => {
-    const mapped =
-      error instanceof HttpApiError
-        ? error
-        : error instanceof ApplicationApiError
-          ? applicationError(error)
-          : error instanceof z.ZodError
-            ? zodError(error)
-            : new HttpApiError(500, "INTERNAL_ERROR", "Unexpected internal error");
-    if (mapped.statusCode >= 500 && !(error instanceof HttpApiError)) {
-      request.log.error(
-        { err: error, event: "api_request_failed", request_id: request.id },
-        "API request failed",
+    const requireAdmin = (request: FastifyRequest): Promise<void> => {
+      authenticate(request, configuredAdminToken, "admin");
+      return Promise.resolve();
+    };
+    const requireUser = (request: FastifyRequest): Promise<void> => {
+      authenticate(request, configuredToken, "user");
+      return Promise.resolve();
+    };
+
+    api.addHook("onSend", async (_request, reply) => {
+      void reply
+        .header("cache-control", "no-store")
+        .header("content-security-policy", "default-src 'none'; frame-ancestors 'none'")
+        .header("cross-origin-resource-policy", "same-origin")
+        .header("permissions-policy", "camera=(), microphone=(), geolocation=()")
+        .header("referrer-policy", "no-referrer")
+        .header("x-content-type-options", "nosniff")
+        .header("x-frame-options", "DENY")
+        .header("x-radar-api-version", API_CONTRACT_VERSION_V1);
+    });
+    api.addHook("onResponse", async (request, reply) => {
+      request.log.info(
+        {
+          event: "api_request_completed",
+          method: request.method,
+          request_id: request.id,
+          route: request.routeOptions.url,
+          status_code: reply.statusCode,
+        },
+        "API request completed",
       );
+    });
+    if (options.onClose !== undefined) {
+      api.addHook("onClose", options.onClose);
     }
-    if (mapped.statusCode === 401) {
-      void reply.header("www-authenticate", "Bearer");
-    }
-    return reply.code(mapped.statusCode).send(errorResponse(mapped, request.id));
-  });
 
-  app.get<{ Reply: HealthResponse }>("/health", () =>
-    HealthResponseSchema.parse({
-      service: "api",
-      status: "ok",
-      timestamp: now().toISOString(),
-      uptimeSeconds: uptime(),
-      version,
-    }),
-  );
+    api.setErrorHandler((error, request, reply) => {
+      const mapped =
+        error instanceof HttpApiError
+          ? error
+          : error instanceof ApplicationApiError
+            ? applicationError(error)
+            : error instanceof z.ZodError
+              ? zodError(error)
+              : (transportError(error) ??
+                new HttpApiError(500, "INTERNAL_ERROR", "Unexpected internal error"));
+      if (mapped.statusCode >= 500 && !(error instanceof HttpApiError)) {
+        request.log.error(
+          { err: error, event: "api_request_failed", request_id: request.id },
+          "API request failed",
+        );
+      }
+      if (mapped.statusCode === 401) {
+        void reply.header("www-authenticate", "Bearer");
+      }
+      return reply.code(mapped.statusCode).send(errorResponse(mapped, request.id));
+    });
 
-  app.get("/sources", async (request) => {
-    authenticate(request, configuredToken);
-    const query = SourceListQueryV1Schema.parse(request.query);
-    const page = await listSources(requireRepositories(repositories).sources, {
-      ...(query.after === undefined ? {} : { after: sourceId(query.after) }),
-      ...(query.aiProcessingAllowed === undefined
-        ? {}
-        : { aiProcessingAllowed: query.aiProcessingAllowed }),
-      ...(query.enabled === undefined ? {} : { enabled: query.enabled }),
-      limit: query.limit,
-      ...(query.rightsStatus === undefined ? {} : { rightsStatus: query.rightsStatus }),
-      ...(query.vertical === undefined ? {} : { vertical: query.vertical }),
-    });
-    return SourceListResponseV1Schema.parse({
-      items: page.items.map(sourceResponse),
-      nextCursor: page.nextCursor,
-    });
-  });
-
-  app.post("/sources", async (request, reply) => {
-    authenticate(request, configuredToken);
-    const body = SourceCreateRequestV1Schema.parse(request.body);
-    const id = sourceId(idFactory());
-    await createSourceEntry({
-      fields: body,
-      id,
-      now: now().toISOString(),
-      repository: requireRepositories(repositories).sources,
-    });
-    return reply.code(201).send(CreatedResourceV1Schema.parse({ id }));
-  });
-
-  app.patch("/sources/:id", async (request, reply) => {
-    authenticate(request, configuredToken);
-    const path = z.strictObject({ id: z.uuid() }).parse(request.params);
-    const body = SourcePatchRequestV1Schema.parse(request.body);
-    await patchSourceEntry({
-      id: sourceId(path.id),
-      now: now().toISOString(),
-      patch: {
-        ...(body.aiProcessingAllowed === undefined
-          ? {}
-          : { aiProcessingAllowed: body.aiProcessingAllowed }),
-        ...(body.collectionPolicy === undefined ? {} : { collectionPolicy: body.collectionPolicy }),
-        ...(body.country === undefined ? {} : { country: body.country }),
-        ...(body.enabled === undefined ? {} : { enabled: body.enabled }),
-        ...(body.name === undefined ? {} : { name: body.name }),
-        ...(body.ownerContact === undefined ? {} : { ownerContact: body.ownerContact }),
-        ...(body.regions === undefined ? {} : { regions: body.regions }),
-        ...(body.reliabilityScore === undefined ? {} : { reliabilityScore: body.reliabilityScore }),
-        ...(body.rightsBasis === undefined ? {} : { rightsBasis: body.rightsBasis }),
-        ...(body.rightsStatus === undefined ? {} : { rightsStatus: body.rightsStatus }),
-        ...(body.signalQualityNotes === undefined
-          ? {}
-          : { signalQualityNotes: body.signalQualityNotes }),
-        ...(body.type === undefined ? {} : { type: body.type }),
-        ...(body.url === undefined ? {} : { url: body.url }),
-        ...(body.verticals === undefined ? {} : { verticals: body.verticals }),
-      },
-      repository: requireRepositories(repositories).sources,
-    });
-    return reply.code(204).send();
-  });
-
-  app.get("/signals", async (request) => {
-    authenticate(request, configuredToken);
-    const query = SignalListQueryV1Schema.parse(request.query);
-    const page = await listSignalOpportunities({
-      callerUserId: callerUserId(request),
-      filter: {
-        ...(query.after === undefined ? {} : { after: recommendationId(query.after) }),
-        ...(query.category === undefined ? {} : { category: query.category }),
-        ...(query.dateFrom === undefined ? {} : { dateFrom: query.dateFrom }),
-        ...(query.dateTo === undefined ? {} : { dateTo: query.dateTo }),
-        limit: query.limit,
-        ...(query.score === undefined ? {} : { minimumScore: query.score }),
-        ...(query.status === undefined ? {} : { status: query.status }),
-        ...(query.vertical === undefined ? {} : { vertical: query.vertical }),
-      },
-      repository: requireRepositories(repositories).signals,
-    });
-    return SignalListResponseV1Schema.parse({
-      items: page.items.map(opportunityResponse),
-      nextCursor: page.nextCursor,
-    });
-  });
-
-  app.get("/signals/:id", async (request) => {
-    authenticate(request, configuredToken);
-    const path = z.strictObject({ id: z.uuid() }).parse(request.params);
-    return opportunityResponse(
-      await getSignalOpportunity({
-        callerUserId: callerUserId(request),
-        repository: requireRepositories(repositories).signals,
-        signalId: signalId(path.id),
+    api.get<{ Reply: HealthResponse }>("/health", () =>
+      HealthResponseSchema.parse({
+        service: "api",
+        status: "ok",
+        timestamp: now().toISOString(),
+        uptimeSeconds: uptime(),
+        version,
       }),
     );
-  });
 
-  app.get("/users/:id/profile", async (request) => {
-    authenticate(request, configuredToken);
-    const path = z.strictObject({ id: z.uuid() }).parse(request.params);
-    return profileResponse(
-      await getUserProfile({
+    api.get("/sources", { onRequest: requireAdmin }, async (request) => {
+      const query = SourceListQueryV1Schema.parse(request.query);
+      const page = await listSources(requireRepositories(repositories).sources, {
+        ...(query.after === undefined ? {} : { after: sourceId(query.after) }),
+        ...(query.aiProcessingAllowed === undefined
+          ? {}
+          : { aiProcessingAllowed: query.aiProcessingAllowed }),
+        ...(query.enabled === undefined ? {} : { enabled: query.enabled }),
+        limit: query.limit,
+        ...(query.rightsStatus === undefined ? {} : { rightsStatus: query.rightsStatus }),
+        ...(query.vertical === undefined ? {} : { vertical: query.vertical }),
+      });
+      return SourceListResponseV1Schema.parse({
+        items: page.items.map(sourceResponse),
+        nextCursor: page.nextCursor,
+      });
+    });
+
+    api.post("/sources", { onRequest: requireAdmin }, async (request, reply) => {
+      const body = SourceCreateRequestV1Schema.parse(request.body);
+      const id = sourceId(idFactory());
+      await createSourceEntry({
+        fields: body,
+        id,
+        now: now().toISOString(),
+        repository: requireRepositories(repositories).sources,
+      });
+      return reply.code(201).send(CreatedResourceV1Schema.parse({ id }));
+    });
+
+    api.patch("/sources/:id", { onRequest: requireAdmin }, async (request, reply) => {
+      const path = z.strictObject({ id: z.uuid() }).parse(request.params);
+      const body = SourcePatchRequestV1Schema.parse(request.body);
+      await patchSourceEntry({
+        id: sourceId(path.id),
+        now: now().toISOString(),
+        patch: {
+          ...(body.aiProcessingAllowed === undefined
+            ? {}
+            : { aiProcessingAllowed: body.aiProcessingAllowed }),
+          ...(body.collectionPolicy === undefined
+            ? {}
+            : { collectionPolicy: body.collectionPolicy }),
+          ...(body.country === undefined ? {} : { country: body.country }),
+          ...(body.enabled === undefined ? {} : { enabled: body.enabled }),
+          ...(body.name === undefined ? {} : { name: body.name }),
+          ...(body.ownerContact === undefined ? {} : { ownerContact: body.ownerContact }),
+          ...(body.regions === undefined ? {} : { regions: body.regions }),
+          ...(body.reliabilityScore === undefined
+            ? {}
+            : { reliabilityScore: body.reliabilityScore }),
+          ...(body.rightsBasis === undefined ? {} : { rightsBasis: body.rightsBasis }),
+          ...(body.rightsStatus === undefined ? {} : { rightsStatus: body.rightsStatus }),
+          ...(body.signalQualityNotes === undefined
+            ? {}
+            : { signalQualityNotes: body.signalQualityNotes }),
+          ...(body.type === undefined ? {} : { type: body.type }),
+          ...(body.url === undefined ? {} : { url: body.url }),
+          ...(body.verticals === undefined ? {} : { verticals: body.verticals }),
+        },
+        repository: requireRepositories(repositories).sources,
+      });
+      return reply.code(204).send();
+    });
+
+    api.get("/signals", { onRequest: requireUser }, async (request) => {
+      const query = SignalListQueryV1Schema.parse(request.query);
+      const page = await listSignalOpportunities({
         callerUserId: callerUserId(request),
+        filter: {
+          ...(query.after === undefined ? {} : { after: recommendationId(query.after) }),
+          ...(query.category === undefined ? {} : { category: query.category }),
+          ...(query.dateFrom === undefined ? {} : { dateFrom: query.dateFrom }),
+          ...(query.dateTo === undefined ? {} : { dateTo: query.dateTo }),
+          limit: query.limit,
+          ...(query.score === undefined ? {} : { minimumScore: query.score }),
+          ...(query.status === undefined ? {} : { status: query.status }),
+          ...(query.vertical === undefined ? {} : { vertical: query.vertical }),
+        },
+        repository: requireRepositories(repositories).signals,
+      });
+      return SignalListResponseV1Schema.parse({
+        items: page.items.map(opportunityResponse),
+        nextCursor: page.nextCursor,
+      });
+    });
+
+    api.get("/signals/:id", { onRequest: requireUser }, async (request) => {
+      const path = z.strictObject({ id: z.uuid() }).parse(request.params);
+      return opportunityResponse(
+        await getSignalOpportunity({
+          callerUserId: callerUserId(request),
+          repository: requireRepositories(repositories).signals,
+          signalId: signalId(path.id),
+        }),
+      );
+    });
+
+    api.get("/users/:id/profile", { onRequest: requireUser }, async (request) => {
+      const path = z.strictObject({ id: z.uuid() }).parse(request.params);
+      return profileResponse(
+        await getUserProfile({
+          callerUserId: callerUserId(request),
+          repository: requireRepositories(repositories).profiles,
+          userId: userId(path.id),
+        }),
+      );
+    });
+
+    api.patch("/users/:id/profile", { onRequest: requireUser }, async (request, reply) => {
+      const path = z.strictObject({ id: z.uuid() }).parse(request.params);
+      const body = UserProfilePatchRequestV1Schema.parse(request.body);
+      await patchUserProfile({
+        callerUserId: callerUserId(request),
+        now: now().toISOString(),
+        patch: {
+          ...(body.companySize === undefined ? {} : { companySize: body.companySize }),
+          ...(body.companyType === undefined ? {} : { companyType: body.companyType }),
+          ...(body.excludedKeywords === undefined
+            ? {}
+            : { excludedKeywords: body.excludedKeywords }),
+          ...(body.ignoredEventTypes === undefined
+            ? {}
+            : { ignoredEventTypes: body.ignoredEventTypes }),
+          ...(body.interestedEventTypes === undefined
+            ? {}
+            : { interestedEventTypes: body.interestedEventTypes }),
+          ...(body.keywords === undefined ? {} : { keywords: body.keywords }),
+          ...(body.projectValueRange === undefined
+            ? {}
+            : { projectValueRange: body.projectValueRange }),
+          ...(body.regions === undefined ? {} : { regions: body.regions }),
+          ...(body.servicesAndProducts === undefined
+            ? {}
+            : { servicesAndProducts: body.servicesAndProducts }),
+          ...(body.targetClients === undefined ? {} : { targetClients: body.targetClients }),
+          ...(body.verticals === undefined ? {} : { verticals: body.verticals }),
+        },
         repository: requireRepositories(repositories).profiles,
         userId: userId(path.id),
-      }),
-    );
-  });
-
-  app.patch("/users/:id/profile", async (request, reply) => {
-    authenticate(request, configuredToken);
-    const path = z.strictObject({ id: z.uuid() }).parse(request.params);
-    const body = UserProfilePatchRequestV1Schema.parse(request.body);
-    await patchUserProfile({
-      callerUserId: callerUserId(request),
-      now: now().toISOString(),
-      patch: {
-        ...(body.companySize === undefined ? {} : { companySize: body.companySize }),
-        ...(body.companyType === undefined ? {} : { companyType: body.companyType }),
-        ...(body.excludedKeywords === undefined ? {} : { excludedKeywords: body.excludedKeywords }),
-        ...(body.ignoredEventTypes === undefined
-          ? {}
-          : { ignoredEventTypes: body.ignoredEventTypes }),
-        ...(body.interestedEventTypes === undefined
-          ? {}
-          : { interestedEventTypes: body.interestedEventTypes }),
-        ...(body.keywords === undefined ? {} : { keywords: body.keywords }),
-        ...(body.projectValueRange === undefined
-          ? {}
-          : { projectValueRange: body.projectValueRange }),
-        ...(body.regions === undefined ? {} : { regions: body.regions }),
-        ...(body.servicesAndProducts === undefined
-          ? {}
-          : { servicesAndProducts: body.servicesAndProducts }),
-        ...(body.targetClients === undefined ? {} : { targetClients: body.targetClients }),
-        ...(body.verticals === undefined ? {} : { verticals: body.verticals }),
-      },
-      repository: requireRepositories(repositories).profiles,
-      userId: userId(path.id),
+      });
+      return reply.code(204).send();
     });
-    return reply.code(204).send();
-  });
 
-  app.get("/users/:id/feedback-summary", async (request) => {
-    authenticate(request, configuredToken);
-    const path = z.strictObject({ id: z.uuid() }).parse(request.params);
-    const query = FeedbackSummaryQueryV1Schema.parse(request.query);
-    return feedbackSummaryResponse(
-      await getUserFeedbackSummary({
+    api.get("/users/:id/feedback-summary", { onRequest: requireUser }, async (request) => {
+      const path = z.strictObject({ id: z.uuid() }).parse(request.params);
+      const query = FeedbackSummaryQueryV1Schema.parse(request.query);
+      return feedbackSummaryResponse(
+        await getUserFeedbackSummary({
+          callerUserId: callerUserId(request),
+          generatedAt: now().toISOString(),
+          highScoreLimit: query.highScoreLimit,
+          repository: requireRepositories(repositories).feedbackRead,
+          userId: userId(path.id),
+        }),
+      );
+    });
+
+    api.post("/signals/:id/feedback", { onRequest: requireUser }, async (request, reply) => {
+      const path = z.strictObject({ id: z.uuid() }).parse(request.params);
+      const body = FeedbackCreateRequestV1Schema.parse(request.body);
+      const idempotencyKey = z.uuid().parse(header(request, "idempotency-key"));
+      const result = await submitSignalFeedback({
+        action: body.action,
         callerUserId: callerUserId(request),
-        generatedAt: now().toISOString(),
-        highScoreLimit: query.highScoreLimit,
-        repository: requireRepositories(repositories).feedbackRead,
-        userId: userId(path.id),
-      }),
-    );
-  });
-
-  app.post("/signals/:id/feedback", async (request, reply) => {
-    authenticate(request, configuredToken);
-    const path = z.strictObject({ id: z.uuid() }).parse(request.params);
-    const body = FeedbackCreateRequestV1Schema.parse(request.body);
-    const idempotencyKey = z.uuid().parse(header(request, "idempotency-key"));
-    const result = await submitSignalFeedback({
-      action: body.action,
-      callerUserId: callerUserId(request),
-      feedbackId: feedbackId(idempotencyKey),
-      now: now().toISOString(),
-      ...(body.reason === undefined ? {} : { reason: body.reason }),
-      repository: requireRepositories(repositories).feedback,
-      signalId: signalId(path.id),
+        feedbackId: feedbackId(idempotencyKey),
+        now: now().toISOString(),
+        ...(body.reason === undefined ? {} : { reason: body.reason }),
+        repository: requireRepositories(repositories).feedback,
+        signalId: signalId(path.id),
+      });
+      return reply
+        .code(result.created ? 201 : 200)
+        .send(CreatedResourceV1Schema.parse({ id: result.feedback.id }));
     });
-    return reply
-      .code(result.created ? 201 : 200)
-      .send(CreatedResourceV1Schema.parse({ id: result.feedback.id }));
   });
 
   return app;

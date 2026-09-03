@@ -23,11 +23,11 @@
 - `ERROR` — terminal failure на process/job boundary.
 - `CRITICAL`/Pino `fatal` — процесс не может запуститься.
 
-Одна ошибка логируется один раз на внешней границе. Expected failure передаётся через `error_code`; stack допустим для неожиданной ошибки на boundary.
+Одна ошибка логируется один раз на внешней границе. Expected failure передаётся через `error_code`; stack допустим для неожиданной ошибки на boundary и проходит credential sanitization.
 
 ## Запрещённые данные
 
-Нельзя логировать raw text/payload, prompt или ответ модели целиком, Telegram user ID, feedback-текст, токены, cookies, authorization headers, пароли, API keys и database URL. Logger дополнительно редактирует известные secret-пути в `camelCase` и `snake_case`, но redaction не заменяет правильный выбор полей.
+Нельзя логировать raw text/payload, prompt или ответ модели целиком, Telegram user ID, feedback-текст, токены, cookies, authorization headers, пароли, API keys и database URL. Logger редактирует известные secret-пути в `camelCase`/`snake_case` и credentials внутри serialized error message/stack. API отключает стандартный raw-URL request log и пишет только route template, method, status и request ID. Redaction не заменяет правильный выбор полей.
 
 Metric labels содержат только закрытые перечисления (`stage`, `status`, `outcome`, `kind`, `job_type`). Идентификаторы, provider/model и error message не попадают в labels.
 

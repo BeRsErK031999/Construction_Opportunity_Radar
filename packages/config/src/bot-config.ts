@@ -8,7 +8,7 @@ const emptyStringToUndefined = (value: unknown): unknown =>
 const environmentValue = <Schema extends z.ZodType>(schema: Schema) =>
   z.preprocess(emptyStringToUndefined, schema);
 
-const LOCAL_DATABASE_URL = "postgresql://radar:radar_local@127.0.0.1:54329/radar";
+const LOCAL_DATABASE_URL = "postgresql://radar_runtime:radar_runtime_local@127.0.0.1:54329/radar";
 const DatabaseUrlSchema = z
   .string()
   .trim()
@@ -29,7 +29,14 @@ const BotEnvironmentSchema = z
       z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     ),
     DATABASE_URL: environmentValue(DatabaseUrlSchema.optional()),
-    TELEGRAM_BOT_TOKEN: environmentValue(z.string().trim().min(32).max(512)),
+    TELEGRAM_BOT_TOKEN: environmentValue(
+      z
+        .string()
+        .trim()
+        .min(32)
+        .max(512)
+        .regex(/^\d{6,12}:[A-Za-z0-9_-]{32,64}$/, "must have Telegram Bot API token format"),
+    ),
     TELEGRAM_POLLING_TIMEOUT_SECONDS: environmentValue(
       z.coerce.number().int().min(1).max(50).default(30),
     ),

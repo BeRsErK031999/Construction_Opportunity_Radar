@@ -26,10 +26,12 @@ The adapter repeats the collection permission check before HTTP I/O. A source un
 - exponential delay: 250 ms, bounded at 5 seconds, respecting a bounded `Retry-After`;
 - rate limit: at least 1 second between requests to the same origin;
 - maximum response body: 2 MiB;
+- outbound target: HTTP(S), default port, no URL credentials, public DNS/IP only;
+- redirects: manual validation on every hop, maximum 5;
 - accepted media types: RSS, Atom, XML and plain-text XML;
 - identifying user-agent: project name and public repository URL, configurable by composition root.
 
-Oversized bodies, unsupported media, invalid XML, missing item URL/text, and exhausted retries produce typed errors without embedding response bodies, credentials, or transport details in their messages.
+Oversized bodies, unsupported media, invalid XML, missing item URL/text, disallowed targets/redirects, and exhausted retries produce typed errors without embedding response bodies, credentials, or transport details in their messages. Loopback, private, link-local, reserved and metadata-network destinations are refused before fetch. Production egress rules must still allow only reviewed source origins because DNS validation cannot fully remove the resolver-to-connect rebinding window.
 
 ## Provenance
 
@@ -55,7 +57,7 @@ pnpm build
 pnpm audit
 ```
 
-Tests use injected HTTP outcomes and checked-in RSS/Atom fixtures. They cover parsing, end-to-end ingestion idempotency, permission refusal before I/O, timeout retry exhaustion, transient status retry, rate limiting, content-type rejection, malformed XML, response-size bounds, metrics, and safe error messages.
+Tests use injected HTTP/DNS outcomes and checked-in RSS/Atom fixtures. They cover parsing, end-to-end ingestion idempotency, permission refusal before I/O, SSRF/private-IP and redirect refusal, timeout retry exhaustion, transient status retry, rate limiting, content-type rejection, malformed XML, response-size bounds, metrics, and safe error messages.
 
 ## Live smoke prerequisite
 

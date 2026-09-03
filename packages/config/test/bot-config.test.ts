@@ -7,12 +7,18 @@ const BOT_TOKEN = `123456:${"a".repeat(40)}`;
 describe("loadBotConfig", () => {
   it("loads bounded long-polling defaults without exposing unrelated environment", () => {
     expect(loadBotConfig({ TELEGRAM_BOT_TOKEN: BOT_TOKEN })).toEqual({
-      databaseUrl: "postgresql://radar:radar_local@127.0.0.1:54329/radar",
+      databaseUrl: "postgresql://radar_runtime:radar_runtime_local@127.0.0.1:54329/radar",
       logLevel: "info",
       nodeEnv: "development",
       pollingTimeoutSeconds: 30,
       telegramBotToken: BOT_TOKEN,
     });
+  });
+
+  it("rejects a long value that is not a Telegram Bot API token", () => {
+    expect(() => loadBotConfig({ TELEGRAM_BOT_TOKEN: "x".repeat(64) })).toThrow(
+      /TELEGRAM_BOT_TOKEN/,
+    );
   });
 
   it("requires a token and bounds the polling timeout", () => {

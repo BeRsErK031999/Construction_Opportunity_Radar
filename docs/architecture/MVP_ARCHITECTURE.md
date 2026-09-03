@@ -270,6 +270,7 @@ Use foreign keys, unique constraints, and migrations to enforce invariants. JSON
 
 ## Reliability and security
 
+- ART-022 security baseline is defined by ADR-0004 and `docs/security/THREAT_MODEL.md`.
 - separate least-privilege database role per environment and restricted runtime credentials;
 - PostgreSQL and Ollama stay on localhost or a private restricted network;
 - typed config fails fast for the selected process/provider and does not demand unrelated credentials;
@@ -279,6 +280,10 @@ Use foreign keys, unique constraints, and migrations to enforce invariants. JSON
 - monitoring covers disk, GPU when present, queue depth/wait, source errors, AI failures, and delivery failures;
 - logs redact bot tokens, passwords, authorization headers, full private PII, and private source credentials;
 - `.env`, Telegram sessions, keys, local model artifacts, and runtime data remain outside Git.
+
+The private API keeps `trustProxy` disabled and loopback binding mandatory. Source Registry routes use a distinct admin service token; user-scoped routes use a separate local-process token plus the trusted caller UUID assertion. Every route has a process-local IPv6-normalizing rate limit and request-body bound. This is not an end-user/public authentication scheme or a distributed DDoS boundary.
+
+The default HTTP transport resolves each outbound target, blocks non-public/reserved addresses and revalidates manually followed redirects. Because the connection layer performs a later resolution, deployment egress policy and approved-source origin review remain required against DNS rebinding. Runtime PostgreSQL credentials receive table DML and schema usage only; migrations use a separate owner credential.
 
 ## Observability chain
 

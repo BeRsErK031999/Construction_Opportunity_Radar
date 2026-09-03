@@ -276,6 +276,25 @@ describe("RssHttpSourceAdapter", () => {
     expect(adapter.metrics()).toMatchObject({ failedFetches: 1, requestAttempts: 2, retries: 1 });
   });
 
+  it("does not retry a target rejected by the outbound network policy", async () => {
+    const http = new QueueHttpTransport([
+      new HttpTransportError("HTTP_TARGET_NOT_PERMITTED", "private target detail"),
+    ]);
+    const adapter = new RssHttpSourceAdapter({
+      http,
+      maxAttempts: 3,
+      minimumRequestIntervalMs: 0,
+    });
+
+    await expect(adapter.fetch({ cursor: null, source: source() })).rejects.toMatchObject({
+      attempts: 1,
+      code: "RSS_REQUEST_FAILED",
+      message: "RSS target is not permitted by the network policy",
+      retryable: false,
+    });
+    expect(http.requests).toHaveLength(1);
+  });
+
   it("does not retry non-retryable status or unsupported content", async () => {
     const missing = new QueueHttpTransport([response("not found", 404)]);
     const missingAdapter = new RssHttpSourceAdapter({

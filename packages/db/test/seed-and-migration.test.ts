@@ -36,6 +36,10 @@ const processingJobsMigrationPath = new URL(
   "../prisma/migrations/20260902210000_add_processing_jobs/migration.sql",
   import.meta.url,
 );
+const runtimeRolePath = new URL(
+  "../../../infra/postgres/bootstrap-runtime-role.sh",
+  import.meta.url,
+);
 
 describe("development seed contract", () => {
   it("contains ten sources and one hundred uniquely attributable raw items", () => {
@@ -62,6 +66,18 @@ describe("development seed contract", () => {
 });
 
 describe("initial migration contract", () => {
+  it("provisions a non-owner runtime role with DML but no DDL privileges", async () => {
+    const bootstrap = await readFile(runtimeRolePath, "utf8");
+
+    expect(bootstrap).toContain("NOSUPERUSER");
+    expect(bootstrap).toContain("NOCREATEDB");
+    expect(bootstrap).toContain("NOCREATEROLE");
+    expect(bootstrap).toContain("NOBYPASSRLS");
+    expect(bootstrap).toContain("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES");
+    expect(bootstrap).toContain("REVOKE ALL ON SCHEMA public FROM PUBLIC");
+    expect(bootstrap).not.toContain("GRANT CREATE ON SCHEMA");
+  });
+
   it("keeps permission, idempotency, score, and feedback constraints in SQL", async () => {
     const migration = await readFile(migrationPath, "utf8");
 

@@ -482,6 +482,16 @@ export class RssHttpSourceAdapter implements SourceAdapter {
             { attempts: attempt, retryable: false },
           );
         }
+        if (
+          error instanceof HttpTransportError &&
+          (error.code === "HTTP_TARGET_NOT_PERMITTED" || error.code === "HTTP_REDIRECT_LIMIT")
+        ) {
+          throw new RssHttpAdapterError(
+            "RSS_REQUEST_FAILED",
+            "RSS target is not permitted by the network policy",
+            { attempts: attempt, retryable: false },
+          );
+        }
         if (attempt < this.#maxAttempts) {
           await this.#retryDelay(attempt, 0);
           continue;

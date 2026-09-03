@@ -20,7 +20,9 @@
 | 403 | `FORBIDDEN` | Доступ к чужому профилю или запрещённая операция пользователя |
 | 404 | `NOT_FOUND` | Ресурс или персональная Recommendation не найдены |
 | 409 | `CONFLICT` | Идентификатор уже связан с другим ресурсом/feedback |
+| 413 | `PAYLOAD_TOO_LARGE` | Request body превышает настроенный предел |
 | 422 | `VALIDATION_ERROR` | Transport валиден, но нарушен доменный инвариант |
+| 429 | `RATE_LIMITED` | IP исчерпал текущий request budget; повторять после `Retry-After` |
 | 503 | `API_NOT_CONFIGURED` | Нет server token или database repositories |
 | 500 | `INTERNAL_ERROR` | Непредвиденная ошибка; внутренние детали доступны только в server log |
 

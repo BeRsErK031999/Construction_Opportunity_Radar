@@ -17,9 +17,12 @@ pnpm install --frozen-lockfile
 pnpm db:up
 pnpm db:migrate:deploy
 pnpm db:seed
+pnpm db:grant-runtime
 ```
 
-The development defaults are defined in Docker Compose and Prisma config. To use another database, set `DATABASE_URL` in the root `.env`; `.env.example` intentionally contains no value.
+The development defaults are defined in Docker Compose and Prisma config. The Compose owner `radar` performs migrations; application/CLI defaults connect as `radar_runtime`, which has table DML but no schema DDL. A fresh volume provisions runtime automatically; `db:grant-runtime` idempotently provisions or rotates it on an existing volume.
+
+For another database, services receive a runtime `DATABASE_URL`, while the operator/migration environment receives `MIGRATION_DATABASE_URL`. `.env.example` intentionally contains no values. Never make the owner/migration URL available to API, bot or worker services.
 
 On a clean database the seed prints:
 
@@ -67,6 +70,8 @@ pnpm test:integration
 
 Integration tests start an isolated PostgreSQL container, apply the checked-in migrations, verify database permission/profile/delivery/job constraints and repository mapping, test RawItem idempotency/conflict behavior, run the seed twice, normalize without changing raw evidence, and prove the repeatable 200-to-150 dedup result plus the complete 110-analysis/110-recommendation fake-provider path, daily/weekly Digest and idempotent digest delivery. Job scenarios additionally cover concurrent single-claim, no-overlap, delayed/terminal retry, stale lease recovery and a process restart without duplicate enqueue.
 
+The role bootstrap contract and a live local check verify that `radar_runtime` has `USAGE` on `public` and CRUD on application tables, but not `CREATE`, superuser, database/role creation, replication or row-security bypass. Runtime sessions also have bounded statement, lock and idle-transaction timeouts.
+
 ## Stop and clean reset
 
 `pnpm db:down` stops the project containers and preserves the named PostgreSQL volume.
@@ -83,5 +88,6 @@ Then repeat `db:up`, `db:migrate:deploy`, and `db:seed`.
 
 - The Compose port binds to `127.0.0.1`, not all network interfaces.
 - Local default credentials are development-only and must not be reused in production.
+- Production owner/migration and runtime users need independent generated passwords; runtime must not own the database or schema.
 - Never commit `.env` or a production `DATABASE_URL`.
 - Runtime code receives a database URL from its composition root; repositories do not read environment variables or log connection strings.

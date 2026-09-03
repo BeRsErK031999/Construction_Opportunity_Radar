@@ -7,4 +7,4 @@
 - [Private API v1](private/v1/README.md)
 - [Навигация по контрактам](SUMMARY.md)
 
-API предназначен для loopback-доступа приложений модульного монолита. Публичная публикация до security hardening запрещена.
+API предназначен только для loopback-доступа приложений модульного монолита. ART-022 добавил scoped service tokens, request/rate bounds и защитные response headers, но `X-Radar-User-Id` остаётся доверенным service assertion, поэтому публичная публикация требует отдельной схемы end-user authentication.

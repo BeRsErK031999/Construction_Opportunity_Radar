@@ -58,8 +58,12 @@ export const startApi = async (options: StartApiOptions): Promise<RunningApi> =>
       service: "api",
     });
   const app = buildApi({
+    adminAuthToken: config.adminAuthToken,
     apiAuthToken: config.apiAuthToken,
+    bodyLimitBytes: config.bodyLimitBytes,
     logger,
+    rateLimitMax: config.rateLimitMax,
+    rateLimitWindowMs: config.rateLimitWindowMs,
     ...(options.onClose === undefined ? {} : { onClose: options.onClose }),
     ...(options.repositories === undefined ? {} : { repositories: options.repositories }),
   });

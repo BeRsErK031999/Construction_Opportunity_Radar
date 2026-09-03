@@ -5,6 +5,7 @@
   "type": "module",
   "main": "./dist/main.js",
   "dependencies": {
+    "@fastify/rate-limit": "11.2.0",
     "@radar/application": "workspace:*",
     "@radar/config": "workspace:*",
     "@radar/contracts": "workspace:*",

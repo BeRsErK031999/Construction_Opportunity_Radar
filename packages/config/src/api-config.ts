@@ -11,7 +11,7 @@ const emptyStringToUndefined = (value: unknown): unknown => {
 const environmentValue = <Schema extends z.ZodType>(schema: Schema) =>
   z.preprocess(emptyStringToUndefined, schema);
 
-const LOCAL_DATABASE_URL = "postgresql://radar:radar_local@127.0.0.1:54329/radar";
+const LOCAL_DATABASE_URL = "postgresql://radar_runtime:radar_runtime_local@127.0.0.1:54329/radar";
 const DatabaseUrlSchema = z
   .string()
   .trim()
@@ -23,6 +23,11 @@ const DatabaseUrlSchema = z
       return false;
     }
   }, "must be a PostgreSQL connection URL");
+const ServiceTokenSchema = z
+  .string()
+  .min(32)
+  .max(512)
+  .regex(/^[!-~]+$/, "must contain only visible ASCII characters without spaces");
 
 const ApiEnvironmentSchema = z
   .object({
@@ -34,7 +39,15 @@ const ApiEnvironmentSchema = z
     ),
     API_HOST: environmentValue(z.string().trim().min(1).default("127.0.0.1")),
     API_PORT: environmentValue(z.coerce.number().int().min(0).max(65_535).default(3_000)),
-    API_AUTH_TOKEN: environmentValue(z.string().min(32).max(512).optional()),
+    API_AUTH_TOKEN: environmentValue(ServiceTokenSchema.optional()),
+    API_ADMIN_AUTH_TOKEN: environmentValue(ServiceTokenSchema.optional()),
+    API_BODY_LIMIT_BYTES: environmentValue(
+      z.coerce.number().int().min(1_024).max(1_048_576).default(65_536),
+    ),
+    API_RATE_LIMIT_MAX: environmentValue(z.coerce.number().int().min(1).max(10_000).default(60)),
+    API_RATE_LIMIT_WINDOW_MS: environmentValue(
+      z.coerce.number().int().min(1_000).max(3_600_000).default(60_000),
+    ),
     DATABASE_URL: environmentValue(DatabaseUrlSchema.optional()),
     SHUTDOWN_TIMEOUT_MS: environmentValue(
       z.coerce.number().int().min(100).max(120_000).default(10_000),
@@ -55,6 +68,24 @@ const ApiEnvironmentSchema = z
         path: ["API_AUTH_TOKEN"],
       });
     }
+    if (environment.NODE_ENV === "production" && environment.API_ADMIN_AUTH_TOKEN === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "is required in production",
+        path: ["API_ADMIN_AUTH_TOKEN"],
+      });
+    }
+    if (
+      environment.API_AUTH_TOKEN !== undefined &&
+      environment.API_ADMIN_AUTH_TOKEN !== undefined &&
+      environment.API_AUTH_TOKEN === environment.API_ADMIN_AUTH_TOKEN
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "must differ from API_AUTH_TOKEN",
+        path: ["API_ADMIN_AUTH_TOKEN"],
+      });
+    }
     if (environment.NODE_ENV === "production" && environment.DATABASE_URL === undefined) {
       context.addIssue({
         code: "custom",
@@ -68,19 +99,23 @@ const ApiEnvironmentSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "must stay on a loopback interface until public API hardening is complete",
+        message: "must stay on a loopback interface for the private API",
         path: ["API_HOST"],
       });
     }
   });
 
 export interface ApiConfig {
+  readonly adminAuthToken: string | null;
   readonly apiAuthToken: string | null;
+  readonly bodyLimitBytes: number;
   readonly databaseUrl: string;
   readonly host: string;
   readonly logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
   readonly nodeEnv: "development" | "test" | "production";
   readonly port: number;
+  readonly rateLimitMax: number;
+  readonly rateLimitWindowMs: number;
   readonly shutdownTimeoutMs: number;
 }
 
@@ -107,12 +142,16 @@ export const loadApiConfig = (environment: NodeJS.ProcessEnv = process.env): Api
   }
 
   return Object.freeze({
+    adminAuthToken: result.data.API_ADMIN_AUTH_TOKEN ?? null,
     apiAuthToken: result.data.API_AUTH_TOKEN ?? null,
+    bodyLimitBytes: result.data.API_BODY_LIMIT_BYTES,
     databaseUrl: result.data.DATABASE_URL ?? LOCAL_DATABASE_URL,
     host: result.data.API_HOST,
     logLevel: result.data.LOG_LEVEL,
     nodeEnv: result.data.NODE_ENV,
     port: result.data.API_PORT,
+    rateLimitMax: result.data.API_RATE_LIMIT_MAX,
+    rateLimitWindowMs: result.data.API_RATE_LIMIT_WINDOW_MS,
     shutdownTimeoutMs: result.data.SHUTDOWN_TIMEOUT_MS,
   });
 };

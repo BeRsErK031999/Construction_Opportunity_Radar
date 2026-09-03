@@ -11,7 +11,8 @@ API вызывают доверенные локальные transport-адап�
 - Время — ISO 8601 с timezone; ответы нормализуются в UTC.
 - Списки ограничены `limit <= 100`.
 - Все ответы содержат `X-Radar-API-Version: 1`.
-- `/health` публичен и не проверяет PostgreSQL. Остальные endpoints требуют Bearer token.
+- `/health` не требует credentials и не проверяет PostgreSQL. Все routes ограничены по IP; business endpoints требуют scoped Bearer token.
+- Request body по умолчанию ограничен 64 KiB; ответы имеют `Cache-Control: no-store` и защитные browser headers.
 - Лимиты строк, массивов и чисел закреплены Zod-схемами в `packages/contracts/src/api-v1.ts`.
 
 ## Ресурсы

@@ -7,12 +7,16 @@ import { createLogger } from "@radar/observability";
 import { startApi } from "../src/lifecycle.js";
 
 const testConfig: ApiConfig = {
+  adminAuthToken: null,
   apiAuthToken: null,
-  databaseUrl: "postgresql://radar:radar_local@127.0.0.1:54329/radar",
+  bodyLimitBytes: 65_536,
+  databaseUrl: "postgresql://radar_runtime:radar_runtime_local@127.0.0.1:54329/radar",
   host: "127.0.0.1",
   logLevel: "silent",
   nodeEnv: "test",
   port: 0,
+  rateLimitMax: 60,
+  rateLimitWindowMs: 60_000,
   shutdownTimeoutMs: 2_000,
 };
 

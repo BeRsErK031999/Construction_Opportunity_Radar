@@ -28,6 +28,7 @@ import { createLogger } from "@radar/observability";
 import { buildApi, type ApiRepositories } from "../src/app.js";
 
 const AUTH_TOKEN = "a".repeat(32);
+const ADMIN_AUTH_TOKEN = "b".repeat(32);
 const USER_ID = "10000000-0000-4000-8000-000000000001";
 const OTHER_USER_ID = "10000000-0000-4000-8000-000000000002";
 const PROFILE_ID = "20000000-0000-4000-8000-000000000001";
@@ -48,6 +49,8 @@ const authorizedHeaders = (caller = USER_ID) => ({
   authorization: `Bearer ${AUTH_TOKEN}`,
   "x-radar-user-id": caller,
 });
+
+const adminHeaders = () => ({ authorization: `Bearer ${ADMIN_AUTH_TOKEN}` });
 
 const sourceRequest = () => ({
   aiProcessingAllowed: true,
@@ -202,13 +205,18 @@ const repositories = () => {
   };
 };
 
-const createTestApi = (apiRepositories: ApiRepositories | null = repositories().api) => {
+const createTestApi = (
+  apiRepositories: ApiRepositories | null = repositories().api,
+  overrides: Partial<Parameters<typeof buildApi>[0]> = {},
+) => {
   const app = buildApi({
+    adminAuthToken: ADMIN_AUTH_TOKEN,
     apiAuthToken: AUTH_TOKEN,
     idFactory: () => SOURCE_ID,
     logger: createLogger({ level: "silent", service: "api-business-test" }),
     now: () => new Date(NOW),
     repositories: apiRepositories,
+    ...overrides,
   });
   apps.push(app);
   return app;
@@ -220,7 +228,7 @@ describe("private HTTP API v1", () => {
 
     const unauthorized = await app.inject({ method: "GET", url: "/sources" });
     const unavailable = await app.inject({
-      headers: authorizedHeaders(),
+      headers: adminHeaders(),
       method: "GET",
       url: "/sources",
     });
@@ -231,18 +239,36 @@ describe("private HTTP API v1", () => {
     expect(unavailable.statusCode).toBe(503);
   });
 
+  it("separates source administration from user-scoped API access", async () => {
+    const app = createTestApi();
+
+    const userOnAdminRoute = await app.inject({
+      headers: authorizedHeaders(),
+      method: "GET",
+      url: "/sources",
+    });
+    const adminOnUserRoute = await app.inject({
+      headers: { ...adminHeaders(), "x-radar-user-id": USER_ID },
+      method: "GET",
+      url: "/signals",
+    });
+
+    expect(userOnAdminRoute.statusCode).toBe(401);
+    expect(adminOnUserRoute.statusCode).toBe(401);
+  });
+
   it("creates a source and enforces its AI rights invariant on patch", async () => {
     const state = repositories();
     const app = createTestApi(state.api);
 
     const created = await app.inject({
-      headers: authorizedHeaders(),
+      headers: adminHeaders(),
       method: "POST",
       payload: sourceRequest(),
       url: "/sources",
     });
     const unsafePatch = await app.inject({
-      headers: authorizedHeaders(),
+      headers: adminHeaders(),
       method: "PATCH",
       payload: { rightsStatus: "REVIEW_REQUIRED" },
       url: `/sources/${SOURCE_ID}`,
@@ -260,7 +286,7 @@ describe("private HTTP API v1", () => {
     const app = createTestApi();
 
     const response = await app.inject({
-      headers: authorizedHeaders(),
+      headers: adminHeaders(),
       method: "POST",
       payload: { ...sourceRequest(), undocumented: true },
       url: "/sources",
@@ -268,6 +294,48 @@ describe("private HTTP API v1", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
+  });
+
+  it("enforces request bounds, rate limits, and defensive response headers", async () => {
+    const bounded = createTestApi(repositories().api, { bodyLimitBytes: 1_024 });
+    const oversized = await bounded.inject({
+      headers: authorizedHeaders(),
+      method: "PATCH",
+      payload: { companyType: "x".repeat(2_000) },
+      url: `/users/${USER_ID}/profile`,
+    });
+
+    const limited = createTestApi(repositories().api, {
+      rateLimitMax: 2,
+      rateLimitWindowMs: 60_000,
+    });
+    const first = await limited.inject({
+      method: "GET",
+      remoteAddress: "2001:db8:1:2::1",
+      url: "/health",
+    });
+    const second = await limited.inject({
+      method: "GET",
+      remoteAddress: "2001:db8:1:2::2",
+      url: "/health",
+    });
+    const exceeded = await limited.inject({
+      method: "GET",
+      remoteAddress: "2001:db8:1:2::3",
+      url: "/health",
+    });
+
+    expect(oversized.statusCode).toBe(413);
+    expect(oversized.json()).toMatchObject({ error: { code: "PAYLOAD_TOO_LARGE" } });
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(exceeded.statusCode).toBe(429);
+    expect(exceeded.headers["retry-after"]).toBeDefined();
+    expect(exceeded.json()).toMatchObject({ error: { code: "RATE_LIMITED" } });
+    expect(first.headers["cache-control"]).toBe("no-store");
+    expect(first.headers["content-security-policy"]).toContain("default-src 'none'");
+    expect(first.headers["x-content-type-options"]).toBe("nosniff");
+    expect(first.headers["x-frame-options"]).toBe("DENY");
   });
 
   it("maps bounded signal filters to the personalized recommendation query", async () => {
