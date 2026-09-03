@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-023` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry, security baseline и зашифрованный проверяемый backup/restore. Следующий critical-path пункт — `ART-024 CI`.
+`ART-004`–`ART-023` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry, security baseline и зашифрованный проверяемый backup/restore. `ART-024 CI` реализован локально; до статуса `DONE` нужен первый успешный GitHub Actions run.
 
 Первый продуктовый контур:
 
@@ -41,8 +41,9 @@
 22. [docs/security/THREAT_MODEL.md](docs/security/THREAT_MODEL.md) — активы, trust boundaries, controls и остаточные security-риски.
 23. [docs/runbooks/SECURITY.md](docs/runbooks/SECURITY.md) — secret/dependency checks, scoped auth, runtime DB role, egress и rotation.
 24. [docs/runbooks/BACKUP_RESTORE.md](docs/runbooks/BACKUP_RESTORE.md) — encrypted backup, retention, verified restore и recovery switch.
-25. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-26. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+25. [docs/runbooks/CI.md](docs/runbooks/CI.md) — jobs, test-service boundary, локальное воспроизведение и failure handling.
+26. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+27. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -140,6 +141,8 @@ pnpm db:validate
 pnpm security:check
 ```
 
+GitHub Actions повторяет frozen install и полный quality-набор без production credentials. PostgreSQL поднимается только для отдельного integration job; подробности и локальное воспроизведение описаны в [CI runbook](docs/runbooks/CI.md).
+
 ## Резервное копирование
 
 После безопасной передачи `BACKUP_ENCRYPTION_KEY` в operator environment:
@@ -153,7 +156,7 @@ pnpm db:verify-backup
 
 ## Ближайший технический результат
 
-Реализовать `ART-024`: добавить GitHub Actions для frozen install, lint, typecheck, unit/integration test, build, Prisma и security checks без production credentials, Telegram или реальной модели. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
+Запушить локально готовый `ART-024`, получить первый успешный `Quality` и `PostgreSQL integration` run, затем перейти к `ART-025 Denis-PC/Ollama integration contract`. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
 
 ## Источники планирования
 

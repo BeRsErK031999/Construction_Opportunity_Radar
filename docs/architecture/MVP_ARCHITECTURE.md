@@ -272,6 +272,7 @@ Use foreign keys, unique constraints, and migrations to enforce invariants. JSON
 
 - ART-022 security baseline is defined by ADR-0004 and `docs/security/THREAT_MODEL.md`.
 - ART-023 logical backup/restore baseline is defined by ADR-0005 and `docs/runbooks/BACKUP_RESTORE.md`.
+- ART-024 CI separates dependency-free quality checks from migration-backed integration tests as documented in `docs/runbooks/CI.md`.
 - separate least-privilege database role per environment and restricted runtime credentials;
 - PostgreSQL and Ollama stay on localhost or a private restricted network;
 - typed config fails fast for the selected process/provider and does not demand unrelated credentials;
@@ -287,6 +288,8 @@ The private API keeps `trustProxy` disabled and loopback binding mandatory. Sour
 The default HTTP transport resolves each outbound target, blocks non-public/reserved addresses and revalidates manually followed redirects. Because the connection layer performs a later resolution, deployment egress policy and approved-source origin review remain required against DNS rebinding. Runtime PostgreSQL credentials receive table DML and schema usage only; migrations use a separate owner credential.
 
 Backups stream PostgreSQL custom format through authenticated AES-256-GCM encryption into environment-separated storage. Restore never overwrites the operational database: it creates a new target, validates schema and core counts, and requires an operator-controlled connection switch. The encryption key is held separately from the artifact; daily schedule, off-host copy and weekly restore history remain deployment evidence for Gate G5.
+
+CI runs deterministic fake-provider and fake-delivery paths only. Its automatic GitHub token is restricted to read-only repository contents and no application runtime credentials are configured; the integration job receives only an ephemeral loopback `radar_test` URL and starts PostgreSQL as a workflow service. Local tests use Testcontainers unless that narrowly validated CI override is present.
 
 ## Observability chain
 

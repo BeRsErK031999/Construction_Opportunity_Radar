@@ -82,6 +82,7 @@ import {
   seedDevelopmentDatabase,
   type DatabaseClient,
 } from "../src/index.js";
+import { externalIntegrationDatabaseUrl } from "./integration-database-url.js";
 
 const execFileAsync = promisify(execFile);
 const dbPackageDirectory = fileURLToPath(new URL("..", import.meta.url));
@@ -92,12 +93,20 @@ const prismaCli = fileURLToPath(
 
 let container: StartedPostgreSqlContainer | undefined;
 let client: DatabaseClient | undefined;
+let integrationDatabaseUrl: string | undefined;
 
 const database = (): DatabaseClient => {
   if (client === undefined) {
     throw new Error("Integration database is not initialized");
   }
   return client;
+};
+
+const databaseUrl = (): string => {
+  if (integrationDatabaseUrl === undefined) {
+    throw new Error("Integration database URL is not initialized");
+  }
+  return integrationDatabaseUrl;
 };
 
 const migrate = async (databaseUrl: string): Promise<void> => {
@@ -201,14 +210,17 @@ const testProfiles = () => [
 ];
 
 beforeAll(async () => {
-  container = await new PostgreSqlContainer("postgres:17.6-alpine")
-    .withDatabase("radar_test")
-    .withPassword("radar_test")
-    .withUsername("radar_test")
-    .start();
-  const databaseUrl = container.getConnectionUri();
-  await migrate(databaseUrl);
-  client = createDatabaseClient(databaseUrl);
+  integrationDatabaseUrl = externalIntegrationDatabaseUrl() ?? undefined;
+  if (integrationDatabaseUrl === undefined) {
+    container = await new PostgreSqlContainer("postgres:17.6-alpine")
+      .withDatabase("radar_test")
+      .withPassword("radar_test")
+      .withUsername("radar_test")
+      .start();
+    integrationDatabaseUrl = container.getConnectionUri();
+  }
+  await migrate(databaseUrl());
+  client = createDatabaseClient(databaseUrl());
   await client.$connect();
 }, 120_000);
 
@@ -1166,10 +1178,7 @@ describe("PostgreSQL processing jobs", () => {
   });
 
   it("recovers an expired lease after process restart without duplicating the job", async () => {
-    if (container === undefined) {
-      throw new Error("Integration database is not initialized");
-    }
-    const firstClient = createDatabaseClient(container.getConnectionUri());
+    const firstClient = createDatabaseClient(databaseUrl());
     await firstClient.$connect();
     const firstProcess = new PrismaProcessingJobRepository(firstClient);
     const schedule = {
