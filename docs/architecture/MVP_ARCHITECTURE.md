@@ -271,6 +271,7 @@ Use foreign keys, unique constraints, and migrations to enforce invariants. JSON
 ## Reliability and security
 
 - ART-022 security baseline is defined by ADR-0004 and `docs/security/THREAT_MODEL.md`.
+- ART-023 logical backup/restore baseline is defined by ADR-0005 and `docs/runbooks/BACKUP_RESTORE.md`.
 - separate least-privilege database role per environment and restricted runtime credentials;
 - PostgreSQL and Ollama stay on localhost or a private restricted network;
 - typed config fails fast for the selected process/provider and does not demand unrelated credentials;
@@ -284,6 +285,8 @@ Use foreign keys, unique constraints, and migrations to enforce invariants. JSON
 The private API keeps `trustProxy` disabled and loopback binding mandatory. Source Registry routes use a distinct admin service token; user-scoped routes use a separate local-process token plus the trusted caller UUID assertion. Every route has a process-local IPv6-normalizing rate limit and request-body bound. This is not an end-user/public authentication scheme or a distributed DDoS boundary.
 
 The default HTTP transport resolves each outbound target, blocks non-public/reserved addresses and revalidates manually followed redirects. Because the connection layer performs a later resolution, deployment egress policy and approved-source origin review remain required against DNS rebinding. Runtime PostgreSQL credentials receive table DML and schema usage only; migrations use a separate owner credential.
+
+Backups stream PostgreSQL custom format through authenticated AES-256-GCM encryption into environment-separated storage. Restore never overwrites the operational database: it creates a new target, validates schema and core counts, and requires an operator-controlled connection switch. The encryption key is held separately from the artifact; daily schedule, off-host copy and weekly restore history remain deployment evidence for Gate G5.
 
 ## Observability chain
 

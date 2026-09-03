@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-022` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry и security baseline. Следующий critical-path пункт — `ART-023 Backup and restore`.
+`ART-004`–`ART-023` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry, security baseline и зашифрованный проверяемый backup/restore. Следующий critical-path пункт — `ART-024 CI`.
 
 Первый продуктовый контур:
 
@@ -40,8 +40,9 @@
 21. [docs/runbooks/OBSERVABILITY.md](docs/runbooks/OBSERVABILITY.md) — counters, snapshot, cardinality и локальная диагностика.
 22. [docs/security/THREAT_MODEL.md](docs/security/THREAT_MODEL.md) — активы, trust boundaries, controls и остаточные security-риски.
 23. [docs/runbooks/SECURITY.md](docs/runbooks/SECURITY.md) — secret/dependency checks, scoped auth, runtime DB role, egress и rotation.
-24. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-25. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+24. [docs/runbooks/BACKUP_RESTORE.md](docs/runbooks/BACKUP_RESTORE.md) — encrypted backup, retention, verified restore и recovery switch.
+25. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+26. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -139,9 +140,20 @@ pnpm db:validate
 pnpm security:check
 ```
 
+## Резервное копирование
+
+После безопасной передачи `BACKUP_ENCRYPTION_KEY` в operator environment:
+
+```powershell
+pnpm db:backup
+pnpm db:verify-backup
+```
+
+Команды создают encrypted environment-scoped artifact и фактически восстанавливают его во временную БД. Полный recovery-процесс описан в [backup/restore runbook](docs/runbooks/BACKUP_RESTORE.md).
+
 ## Ближайший технический результат
 
-Реализовать `ART-023`: добавить PostgreSQL backup/restore commands, ограниченное хранение и фактически проверить restore по runbook. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
+Реализовать `ART-024`: добавить GitHub Actions для frozen install, lint, typecheck, unit/integration test, build, Prisma и security checks без production credentials, Telegram или реальной модели. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
 
 ## Источники планирования
 

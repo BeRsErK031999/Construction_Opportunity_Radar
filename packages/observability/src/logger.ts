@@ -12,6 +12,8 @@ export const REDACTED_LOG_PATHS = [
   "adminAuthToken",
   "admin_auth_token",
   "authorization",
+  "backupEncryptionKey",
+  "backup_encryption_key",
   "botToken",
   "bot_token",
   "clientSecret",
@@ -50,6 +52,7 @@ export const REDACTED_LOG_PATHS = [
   "env.API_AUTH_TOKEN",
   "env.API_ADMIN_AUTH_TOKEN",
   "env.DATABASE_URL",
+  "env.BACKUP_ENCRYPTION_KEY",
   "env.MIGRATION_DATABASE_URL",
   "env.POSTGRES_PASSWORD",
   "env.POSTGRES_RUNTIME_PASSWORD",
@@ -57,7 +60,7 @@ export const REDACTED_LOG_PATHS = [
 ] as const;
 
 const SENSITIVE_KEY =
-  /^(?:access_?token|admin_?auth_?token|api_?auth_?token|api_?key|authorization|bot_?token|client_?secret|cookie|credentials|database_?url|migration_?database_?url|password|private_?key|refresh_?token|secret|telegram_?bot_?token|token)$/i;
+  /^(?:access_?token|admin_?auth_?token|api_?auth_?token|api_?key|authorization|backup_?encryption_?key|bot_?token|client_?secret|cookie|credentials|database_?url|migration_?database_?url|password|private_?key|refresh_?token|secret|telegram_?bot_?token|token)$/i;
 
 const sanitizeSensitiveText = (value: string): string =>
   value
@@ -68,7 +71,7 @@ const sanitizeSensitiveText = (value: string): string =>
     .replace(/\bBearer\s+[!-~]+/gi, `Bearer ${REDACTED_LOG_VALUE}`)
     .replace(/\b\d{6,12}:[A-Za-z0-9_-]{32,64}\b/g, REDACTED_LOG_VALUE)
     .replace(
-      /\b(API_ADMIN_AUTH_TOKEN|API_AUTH_TOKEN|DATABASE_URL|MIGRATION_DATABASE_URL|POSTGRES_PASSWORD|POSTGRES_RUNTIME_PASSWORD|TELEGRAM_BOT_TOKEN)=([^\s;]+)/gi,
+      /\b(API_ADMIN_AUTH_TOKEN|API_AUTH_TOKEN|BACKUP_ENCRYPTION_KEY|DATABASE_URL|MIGRATION_DATABASE_URL|POSTGRES_PASSWORD|POSTGRES_RUNTIME_PASSWORD|TELEGRAM_BOT_TOKEN)=([^\s;]+)/gi,
       `$1=${REDACTED_LOG_VALUE}`,
     );
 

@@ -21,6 +21,8 @@ packages/db/src/generated/
 logs/
 tmp/
 backups/
+*.corbak
+*.corbak.partial
 *.log
 *.pid
 *.session

@@ -19,6 +19,7 @@ describe("createLogger", () => {
 
     logger.info(
       {
+        backup_encryption_key: "private-backup-key",
         password: "database-password",
         database_url: "postgresql://user:secret@database/radar",
         req: { headers: { authorization: "Bearer private-token" } },
@@ -33,9 +34,11 @@ describe("createLogger", () => {
     expect(record.service).toBe("api-test");
     expect(record.environment).toBe("test");
     expect(record.password).toBe(REDACTED_LOG_VALUE);
+    expect(record.backup_encryption_key).toBe(REDACTED_LOG_VALUE);
     expect(record.database_url).toBe(REDACTED_LOG_VALUE);
     expect(request.headers.authorization).toBe(REDACTED_LOG_VALUE);
     expect(lines[0]).not.toContain("database-password");
+    expect(lines[0]).not.toContain("private-backup-key");
     expect(lines[0]).not.toContain("private-token");
     expect(lines[0]).not.toContain("postgresql://");
   });

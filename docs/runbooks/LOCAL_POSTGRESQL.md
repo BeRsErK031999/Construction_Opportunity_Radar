@@ -72,6 +72,10 @@ Integration tests start an isolated PostgreSQL container, apply the checked-in m
 
 The role bootstrap contract and a live local check verify that `radar_runtime` has `USAGE` on `public` and CRUD on application tables, but not `CREATE`, superuser, database/role creation, replication or row-security bypass. Runtime sessions also have bounded statement, lock and idle-transaction timeouts.
 
+## Backup and recovery
+
+`pnpm db:backup` creates an environment-scoped encrypted logical backup; `pnpm db:verify-backup` proves it through an isolated restore. `pnpm db:restore -- --target-database <new_name>` never replaces the active database. Encryption-key custody, retention, off-host storage and the recovery sequence are documented in [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
+
 ## Stop and clean reset
 
 `pnpm db:down` stops the project containers and preserves the named PostgreSQL volume.

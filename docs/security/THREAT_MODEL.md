@@ -36,7 +36,7 @@ The API trusts `X-Radar-User-Id` only after the user-process Bearer token succee
 | Database takeover from runtime compromise | Loopback port, separate `radar_runtime`, no DDL/superuser/create-role/create-db/replication/bypass-RLS, statement/lock/idle transaction timeouts | Runtime role has CRUD across application tables; schema owner credential must be unavailable to services |
 | Unauthorized Telegram interaction | Bot token format validation, private-chat boundary, pre-registered user lookup, compact callback IDs, ownership checks | Live Telegram smoke and token rotation evidence require real credentials; no token belongs in command history |
 | Supply-chain compromise | Exact dependency versions, frozen lockfile, production dependency audit | ART-024 must enforce checks in CI; dependency audit cannot detect every malicious package |
-| State loss or destructive operator action | PostgreSQL source of truth, restrictive deletes/FKs, documented non-destructive stop | Verified backup/restore and retention are ART-023; this risk remains open |
+| State loss or destructive operator action | PostgreSQL source of truth, restrictive deletes/FKs, encrypted logical backup, no-overwrite restore and verified temporary recovery | Daily schedule, protected off-host copy, weekly restore history and reboot evidence remain required for Gate G5 |
 | AI prompt/data exfiltration | Permission recheck before provider call, sanitized provider request, fake provider by default | Real Ollama network and model controls remain ART-025 |
 
 ## Security invariants
@@ -46,6 +46,7 @@ The API trusts `X-Radar-User-Id` only after the user-process Bearer token succee
 - `API_AUTH_TOKEN` and `API_ADMIN_AUTH_TOKEN` must differ and are required in production.
 - The private API remains loopback-bound; forwarded client-IP headers are not trusted.
 - No token, password, private key, authorization/cookie header, raw payload or full private PII is an intended log field.
+- Backup encryption keys stay separate from database credentials, logs and `.corbak` artifacts; restore targets must be new databases.
 - A live source must pass rights review and outbound network policy; a successful DNS lookup is not permission evidence.
 
 ## Review triggers

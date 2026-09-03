@@ -61,4 +61,4 @@ On suspected credential or data exposure:
 5. If a secret entered Git, treat it as compromised even after removal. Revoke it before any history cleanup and coordinate rewriting/push separately.
 6. Record impact, affected IDs/time range, containment and a regression test or control update.
 
-Backup recovery is handled by ART-023. CI enforcement is handled by ART-024.
+Encrypted backup, key custody and isolated recovery are defined in `docs/runbooks/BACKUP_RESTORE.md`. CI enforcement is handled by ART-024.
