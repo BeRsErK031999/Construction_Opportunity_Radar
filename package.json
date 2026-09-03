@@ -30,6 +30,7 @@
     "process:fixtures": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/process-fixtures.ts",
     "evals:generate": "node scripts/generate-eval-gold-v1.mjs",
     "evals:validate": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/validate-eval-dataset.ts",
+    "benchmark:ai": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/benchmark-ai.ts",
     "lint": "eslint \"apps/**/*.ts\" \"packages/**/*.ts\" \"vitest*.config.ts\" --max-warnings 0",
     "format": "prettier --write \"apps/**/*.ts\" \"packages/**/*.ts\" \"scripts/**/*.mjs\" \"fixtures/**/*.json\" \"*.{json,mjs,ts,yaml,yml}\"",
     "format:check": "prettier --check \"apps/**/*.ts\" \"packages/**/*.ts\" \"scripts/**/*.mjs\" \"fixtures/**/*.json\" \"*.{json,mjs,ts,yaml,yml}\"",

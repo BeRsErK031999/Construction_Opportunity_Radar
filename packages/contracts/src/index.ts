@@ -3,6 +3,13 @@ export {
   AIAnalysisResponseV1Schema,
   type AIAnalysisResponseV1,
 } from "./ai-analysis-v1.js";
+export {
+  AI_BENCHMARK_REPORT_SCHEMA_VERSION_V1,
+  AIBenchmarkFailureV1Schema,
+  AIBenchmarkReportV1Schema,
+  type AIBenchmarkFailureV1,
+  type AIBenchmarkReportV1,
+} from "./ai-benchmark-v1.js";
 export * from "./api-v1.js";
 export {
   EVAL_ANNOTATION_POLICY_VERSION_V1,

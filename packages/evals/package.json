@@ -14,6 +14,8 @@
     "dist"
   ],
   "dependencies": {
-    "@radar/contracts": "workspace:*"
+    "@radar/application": "workspace:*",
+    "@radar/contracts": "workspace:*",
+    "@radar/core": "workspace:*"
   }
 }

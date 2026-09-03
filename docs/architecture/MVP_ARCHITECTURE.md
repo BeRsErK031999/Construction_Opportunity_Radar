@@ -162,6 +162,8 @@ Provider failures use stable codes for invalid/oversized input, timeout, unavail
 
 `ART-019` keeps AI evaluation outside the operational ingestion path. `fixtures/evals/v1` is a Git-versioned, project-authored synthetic technical baseline; `packages/evals` loads it through the strict `eval-gold/v1` contract. The contract enforces the 100/100 vertical balance, relevance and split counts, action/category consistency, and a verbatim source fragment for every expected fact. Calibration data may support prompt work; holdout data is reserved for final runs. Neither split is inserted into PostgreSQL or presented as live-source or human-adjudicated evidence.
 
+`ART-020` adds an offline evaluator without a second AI domain. Eval items are converted through the same domain constructors and `createAIAnalysisRequest`; source vertical is the only label-derived provider hint, while category and relevance inputs stay neutral and expected labels remain evaluator-only. Returned successful Analysis values must pass `ai-analysis/v1`, request identity/version, and source-union checks before scoring. `ai-benchmark-report/v1` keeps response validity, provider failures, classification, conservative exact-evidence factuality, latency, and optional provider-supplied token/VRAM telemetry distinct. Dataset SHA and every behavior-affecting version are recorded so 8B/14B comparisons cannot silently use different inputs. Fake results prove orchestration only; external model runs remain necessary for Gate G1.
+
 The versioned `SignalAnalysis` contract includes at least:
 
 ```text

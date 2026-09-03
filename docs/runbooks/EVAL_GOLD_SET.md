@@ -59,3 +59,5 @@ pnpm exec vitest run packages/evals/test/eval-gold.test.ts
 `evals:validate` печатает counts и SHA-256 семантического JSON. Для текущей версии hash равен `5457ac44d5fc1fff1b216d9aa0fb6a1a168e913b195811e5b633fc2d8238357a`.
 
 Тесты подтверждают строгую схему, баланс, точную evidence-привязку, rejection неподтверждённого факта и отсутствие полного text overlap с `fixture-ingestion/v1`.
+
+Протокол запуска и определения метрик находятся в [AI benchmark runbook](AI_BENCHMARK.md).

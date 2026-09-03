@@ -238,9 +238,15 @@ importers:
 
   packages/evals:
     dependencies:
+      '@radar/application':
+        specifier: workspace:*
+        version: link:../application
       '@radar/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@radar/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/jobs: {}
 

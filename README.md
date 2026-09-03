@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-019` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime и отдельный 200-item eval gold set. Следующий critical-path пункт — `ART-020 AI benchmark harness`.
+`ART-004`–`ART-020` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set и provider-neutral benchmark report. Следующий critical-path пункт — `ART-021 Observability`.
 
 Первый продуктовый контур:
 
@@ -35,8 +35,9 @@
 16. [docs/runbooks/DIGEST.md](docs/runbooks/DIGEST.md) — daily/weekly periods, top-5, weekly metrics, idempotency и recovery.
 17. [docs/runbooks/DURABLE_JOBS.md](docs/runbooks/DURABLE_JOBS.md) — job states, scheduler windows, claim/lease/retry/recovery и операционная диагностика.
 18. [docs/runbooks/EVAL_GOLD_SET.md](docs/runbooks/EVAL_GOLD_SET.md) — контракт, provenance, splits и проверки отдельного gold set.
-19. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-20. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+19. [docs/runbooks/AI_BENCHMARK.md](docs/runbooks/AI_BENCHMARK.md) — запуск, метрики, label boundary и правила одинакового сравнения моделей.
+20. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+21. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -101,6 +102,14 @@ pnpm evals:validate
 
 Правила splits и ограничения технической baseline-разметки описаны в [eval runbook](docs/runbooks/EVAL_GOLD_SET.md).
 
+Provider-neutral benchmark работает офлайн с fake и печатает versioned JSON в stdout:
+
+```powershell
+pnpm benchmark:ai --provider fake --model fixture-analysis-v1 --dataset fixtures/evals/v1/dataset.json --split all
+```
+
+Fake доказывает работу harness, validity/failure paths и отсутствие label leakage, но не качество реальной модели. Определения метрик и внешний 8B/14B protocol — в [benchmark runbook](docs/runbooks/AI_BENCHMARK.md).
+
 ## Telegram UI
 
 Бот запускается отдельным процессом и требует мигрированную PostgreSQL, заранее зарегистрированный Telegram user ID и локальный `TELEGRAM_BOT_TOKEN`:
@@ -126,7 +135,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-020`: добавить `benchmark:ai` для одинакового прогона provider/model по `eval-gold/v1` с JSON validity, classification, factual errors, p50/p95 latency, tokens и failures. Внешнее сравнение 8B/14B остаётся отдельным evidence.
+Реализовать `ART-021`: унифицировать structured events, correlation context и счётчики ingestion/pipeline/AI/delivery без обязательного Grafana. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
 
 ## Источники планирования
 
