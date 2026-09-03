@@ -2,7 +2,7 @@
 
 ## Scope and assets
 
-This baseline covers the closed-MVP modular monolith: private Fastify API, Telegram bot, worker/jobs, PostgreSQL, permitted-source HTTP collection, logs and local configuration. Ollama host integration is not present yet and is covered by ART-025.
+This baseline covers the closed-MVP modular monolith: private Fastify API, Telegram bot, worker/jobs, PostgreSQL, permitted-source HTTP collection, private Ollama adapter, logs and local configuration. Target-host deployment evidence is still external.
 
 Protected assets are source permissions and raw evidence, user/profile/feedback data, recommendations, service and Telegram credentials, database migration/runtime credentials, integrity of versioned analysis/scoring, and service availability.
 
@@ -20,9 +20,13 @@ approved public source
 
 Telegram Bot API
   <-> private-chat, pre-registered-user bot adapter
+
+permission-checked evidence
+  -> bounded AIProvider request
+  -> loopback/tunneled private Ollama origin
 ```
 
-The API trusts `X-Radar-User-Id` only after the user-process Bearer token succeeds. It is a service-to-service caller assertion, not proof of an end user's identity. PostgreSQL and future Ollama endpoints are never public.
+The API trusts `X-Radar-User-Id` only after the user-process Bearer token succeeds. It is a service-to-service caller assertion, not proof of an end user's identity. PostgreSQL and Ollama endpoints are never public.
 
 ## Threats, controls and residual risk
 
@@ -35,9 +39,9 @@ The API trusts `X-Radar-User-Id` only after the user-process Bearer token succee
 | SSRF through a registered source or redirect | Admin-scoped Source Registry, rights boundary, HTTP(S) only, no URL credentials, default ports only, DNS/IP private/reserved block, manual redirect revalidation | DNS rebind remains possible between validation and connect; production host must enforce egress allow rules and source-origin review |
 | Database takeover from runtime compromise | Loopback port, separate `radar_runtime`, no DDL/superuser/create-role/create-db/replication/bypass-RLS, statement/lock/idle transaction timeouts | Runtime role has CRUD across application tables; schema owner credential must be unavailable to services |
 | Unauthorized Telegram interaction | Bot token format validation, private-chat boundary, pre-registered user lookup, compact callback IDs, ownership checks | Live Telegram smoke and token rotation evidence require real credentials; no token belongs in command history |
-| Supply-chain compromise | Exact dependency versions, frozen lockfile, production dependency audit | ART-024 must enforce checks in CI; dependency audit cannot detect every malicious package |
+| Supply-chain compromise | Exact dependency versions, frozen lockfile, production dependency audit enforced by ART-024 CI | Dependency audit cannot detect every malicious package |
 | State loss or destructive operator action | PostgreSQL source of truth, restrictive deletes/FKs, encrypted logical backup, no-overwrite restore and verified temporary recovery | Daily schedule, protected off-host copy, weekly restore history and reboot evidence remain required for Gate G5 |
-| AI prompt/data exfiltration | Permission recheck before provider call, sanitized provider request, fake provider by default | Real Ollama network and model controls remain ART-025 |
+| AI prompt/data exfiltration or public inference exposure | Permission recheck, sanitized request, fake default, loopback Ollama default, credential-free origin validation, explicit private-HTTPS opt-in, bounded request/response and prompt-injection instruction | DNS/private-network status needs host firewall/egress evidence; model behavior still requires external benchmark review |
 
 ## Security invariants
 
@@ -48,6 +52,7 @@ The API trusts `X-Radar-User-Id` only after the user-process Bearer token succee
 - No token, password, private key, authorization/cookie header, raw payload or full private PII is an intended log field.
 - Backup encryption keys stay separate from database credentials, logs and `.corbak` artifacts; restore targets must be new databases.
 - A live source must pass rights review and outbound network policy; a successful DNS lookup is not permission evidence.
+- Ollama stays on loopback or an explicitly restricted private transport; direct remote mode additionally requires HTTPS, certificate validation and a firewall allowlist.
 
 ## Review triggers
 

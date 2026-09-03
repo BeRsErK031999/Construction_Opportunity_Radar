@@ -35,6 +35,7 @@
     "evals:generate": "node scripts/generate-eval-gold-v1.mjs",
     "evals:validate": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/validate-eval-dataset.ts",
     "benchmark:ai": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/benchmark-ai.ts",
+    "ai:health": "tsx --tsconfig tsconfig.typecheck.json apps/cli/src/check-ai-provider.ts",
     "security:secrets": "node scripts/scan-secrets.mjs --history",
     "security:audit": "pnpm audit --prod",
     "security:check": "pnpm security:secrets && pnpm security:audit",

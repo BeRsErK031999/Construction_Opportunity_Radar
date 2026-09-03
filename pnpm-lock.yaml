@@ -103,6 +103,9 @@ importers:
       '@radar/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@radar/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@radar/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

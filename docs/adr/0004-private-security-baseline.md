@@ -26,4 +26,4 @@ The private service can be exercised locally with deterministic limits and negat
 
 The limiter is process-local and resets at restart. The trusted user header still allows impersonation by a holder of the internal user-process token. DNS validation cannot by itself eliminate resolver-to-connect rebinding because the built-in fetch implementation performs its own connection resolution. Production operation must therefore remain loopback/private, restrict egress at the host/firewall, approve source origins and protect service credentials. Multi-instance rate limiting, end-user tokens and public proxy trust are deferred until a measured requirement and a new decision.
 
-Backup/restore, CI enforcement and Ollama-host controls remain ART-023, ART-024 and ART-025 respectively.
+Backup/restore, CI enforcement and Ollama-host controls are completed by ART-023, ART-024 and ADR-0006/ART-025 respectively; target-host operational evidence remains external.

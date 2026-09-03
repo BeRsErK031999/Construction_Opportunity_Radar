@@ -1,4 +1,5 @@
 export {
+  AI_ANALYSIS_RESPONSE_JSON_SCHEMA_V1,
   AI_ANALYSIS_SCHEMA_VERSION_V1,
   AIAnalysisResponseV1Schema,
   type AIAnalysisResponseV1,

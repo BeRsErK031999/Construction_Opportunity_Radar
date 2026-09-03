@@ -76,11 +76,13 @@ Examples of actions:
 - Integration tests retain local Testcontainers by default and accept the CI service URL only for loopback `radar_test` with the dedicated `radar_test` user. No Telegram, Ollama, backup or production credential is present in the workflow.
 - GitHub Actions run `33722329752` on commit `7053f17` passed both jobs. The remote run also exposed and closed two clean-run gaps: every dependency build script is explicitly allowed or denied, and integration aliases no longer depend on pre-existing `dist` output.
 - Milestones M2 and M3 are achieved. Gate G2 is not passed because collector uptime, AI JSON success under a real model, and operational duplicate metrics are not yet evidenced.
-- `ART-025 Denis-PC/Ollama integration contract` is next. Gate G1 remains open until identical external 8B/14B runs exist, and Gate G5 still needs target-host daily/off-host backup, weekly restore history and reboot evidence. Interactive onboarding/profile editing and concrete production schedules remain deferred.
-- No approved live source, Telegram Bot API, or live AI endpoint has been called; no Ollama adapter exists yet.
+- `ART-025 Denis-PC/Ollama integration contract` is complete locally: provider-discriminated config keeps fake as the zero-dependency default and validates Ollama only when selected; `OllamaAIProvider` adds structured non-streaming chat, strict shared response mapping, bounded input/output/timeouts/concurrency, exact-model health and benchmark token telemetry.
+- ADR-0006 and the Ollama runbook require loopback by default, prefer an SSH tunnel for a separate host, allow a direct remote origin only through explicit private HTTPS configuration, and keep model installation/pull, full 8B/14B benchmark, VRAM and target-host changes as external actions.
+- Milestone M4 is locally complete. Gate G1 remains open until identical external 8B/14B runs exist, and Gate G5 still needs target-host daily/off-host backup, weekly restore history and reboot evidence. Interactive onboarding/profile editing and concrete production schedules remain deferred.
+- No approved live source, Telegram Bot API, or live AI endpoint has been called; the Ollama adapter has only been exercised through injected offline transports.
 - ART-002 evidence: frozen install, format check, lint, strict typecheck, 9 tests, build, dependency audit, built-server health request, and SIGINT shutdown all succeeded.
 - Current evidence: frozen install, format, lint, strict typecheck, unit/contract/HTTP/bot/job/eval/observability/security tests, build, Prisma generation/validation, 14 PostgreSQL integration tests, tracked/history secret scan, production dependency audit, deterministic eval validation, one full fake benchmark, a least-privilege database-role check, and repeat local CLI pipeline runs succeed. The Docker-backed suite covers the idempotent 200 -> 200 -> 150 -> 110 -> 110 -> 110 chain plus API, daily/weekly Digest, Telegram delivery, five feedback outcomes, concurrent idempotency, composite attribution integrity, feedback summary, job single-claim/retry/stale/terminal paths, restart recovery, and telemetry propagation across the complete pipeline.
-- ART-001–ART-024 are pushed to `origin/main`; the first complete CI evidence is run `33722329752` on commit `7053f17`. No deploy, live source call, Telegram call, or Ollama call has been performed.
+- ART-001–ART-024 are pushed to `origin/main`; ART-025 is locally implemented and uncommitted. The first complete CI evidence is run `33722329752` on commit `7053f17`. No deploy, live source call, Telegram call, or Ollama call has been performed.
 
 ## People
 
@@ -99,7 +101,7 @@ Market and distribution lead. Owns source research and permissions, source-owner
 - HTTP: Fastify.
 - Database: PostgreSQL with Prisma.
 - Jobs: PostgreSQL-backed queue/job table for MVP; Redis is not mandatory.
-- AI boundary: `AIProvider`; use deterministic `FakeAIProvider` for development and CI, then add `OllamaAIProvider` without changing domain/application logic.
+- AI boundary: `AIProvider`; deterministic `FakeAIProvider` remains the development/CI default, and `OllamaAIProvider` implements the same domain/application contract through explicit composition.
 - LLM target: Ollama + DeepSeek-R1 8B; compare 14B on the same gold set before switching. Ollama stays on the application host or Denis's restricted private host, never public.
 - Bot: Telegram Bot API through grammY behind a delivery adapter; start with long polling.
 - Deployment target: Ubuntu + Docker Engine and/or systemd on the dedicated computer.
@@ -137,7 +139,7 @@ permitted sources
 
 - Source volume: use 20-40 technically connected, stable sources as the first-month baseline; 40-60 vetted sources is the business-side stretch target. Scale to 100+ only after quality gates.
 - Model size: 8B is the default MVP model. 14B is a benchmark candidate, not an assumed upgrade.
-- Model availability: the fixture/fake-provider path is the technical critical path until the target inference host is available; missing Ollama does not block application development.
+- Model availability: the fixture/fake-provider path remains independent of the target inference host; the Ollama adapter and offline integration tests are ready, while real host/model evidence is still required for selection and Gate G1.
 - Telegram: the bot is a delivery channel. Any Telegram content source must have a documented rights/partnership basis.
 - Runtime shape: `api`, `collector`, `worker`, and `bot` are process entry points of one modular monolith, not separately owned microservices.
 - Domain naming: a `Signal` is non-personalized, an `Analysis` is versioned AI output, and a `Recommendation` owns profile-specific company fit and score.

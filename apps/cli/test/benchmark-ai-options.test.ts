@@ -6,7 +6,7 @@ describe("benchmark:ai CLI options", () => {
   it("uses the deterministic fake benchmark defaults", () => {
     expect(parseAIBenchmarkCliOptions([])).toEqual({
       dataset: null,
-      model: "fixture-analysis-v1",
+      model: null,
       promptVersion: "benchmark-prompt/v1",
       provider: "fake",
       selectedSplit: "ALL",
@@ -47,6 +47,9 @@ describe("benchmark:ai CLI options", () => {
     );
     expect(() => parseAIBenchmarkCliOptions(["--vram-peak-mib", "0"])).toThrow(
       "must be a positive number",
+    );
+    expect(() => parseAIBenchmarkCliOptions(["--provider", "remote-api"])).toThrow(
+      "--provider must be fake or ollama",
     );
   });
 });

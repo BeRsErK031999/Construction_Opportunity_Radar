@@ -4,14 +4,14 @@
 
 ## Статус
 
-`ART-004`–`ART-024` реализуют полный независимый от реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry, security baseline, зашифрованный проверяемый backup/restore и зелёный GitHub CI. Следующий critical-path пункт — `ART-025 Denis-PC/Ollama integration contract`.
+`ART-004`–`ART-025` реализуют полный независимый от доступности реальной модели контур: PostgreSQL persistence и least-privilege runtime role, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, scoped/rate-limited private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report, operational telemetry, security baseline, зашифрованный проверяемый backup/restore, зелёный GitHub CI и offline-проверенный `OllamaAIProvider`. Реальные 8B/14B прогоны и target-host evidence остаются внешней частью Gates G1/G5.
 
 Первый продуктовый контур:
 
 - вертикали: строительство и HoReCa;
 - интерфейс: Telegram-бот;
 - основной источник истины: PostgreSQL;
-- AI: `FakeAIProvider` для разработки и CI; затем `OllamaAIProvider` с DeepSeek-R1 8B и обязательным benchmark против 14B;
+- AI: `FakeAIProvider` для разработки и CI; `OllamaAIProvider` для явно выбранного private inference-host, DeepSeek-R1 8B и обязательный benchmark против 14B;
 - владелец продукта и разработки: Артём;
 - источники, рынок и пилот: Денис.
 
@@ -36,14 +36,15 @@
 17. [docs/runbooks/DURABLE_JOBS.md](docs/runbooks/DURABLE_JOBS.md) — job states, scheduler windows, claim/lease/retry/recovery и операционная диагностика.
 18. [docs/runbooks/EVAL_GOLD_SET.md](docs/runbooks/EVAL_GOLD_SET.md) — контракт, provenance, splits и проверки отдельного gold set.
 19. [docs/runbooks/AI_BENCHMARK.md](docs/runbooks/AI_BENCHMARK.md) — запуск, метрики, label boundary и правила одинакового сравнения моделей.
-20. [docs/observability/README.md](docs/observability/README.md) — единый logging-контракт, process events и correlation context.
-21. [docs/runbooks/OBSERVABILITY.md](docs/runbooks/OBSERVABILITY.md) — counters, snapshot, cardinality и локальная диагностика.
-22. [docs/security/THREAT_MODEL.md](docs/security/THREAT_MODEL.md) — активы, trust boundaries, controls и остаточные security-риски.
-23. [docs/runbooks/SECURITY.md](docs/runbooks/SECURITY.md) — secret/dependency checks, scoped auth, runtime DB role, egress и rotation.
-24. [docs/runbooks/BACKUP_RESTORE.md](docs/runbooks/BACKUP_RESTORE.md) — encrypted backup, retention, verified restore и recovery switch.
-25. [docs/runbooks/CI.md](docs/runbooks/CI.md) — jobs, test-service boundary, локальное воспроизведение и failure handling.
-26. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-27. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+20. [docs/runbooks/OLLAMA_INTEGRATION.md](docs/runbooks/OLLAMA_INTEGRATION.md) — private host, conditional config, health и одинаковый 8B/14B protocol.
+21. [docs/observability/README.md](docs/observability/README.md) — единый logging-контракт, process events и correlation context.
+22. [docs/runbooks/OBSERVABILITY.md](docs/runbooks/OBSERVABILITY.md) — counters, snapshot, cardinality и локальная диагностика.
+23. [docs/security/THREAT_MODEL.md](docs/security/THREAT_MODEL.md) — активы, trust boundaries, controls и остаточные security-риски.
+24. [docs/runbooks/SECURITY.md](docs/runbooks/SECURITY.md) — secret/dependency checks, scoped auth, runtime DB role, egress и rotation.
+25. [docs/runbooks/BACKUP_RESTORE.md](docs/runbooks/BACKUP_RESTORE.md) — encrypted backup, retention, verified restore и recovery switch.
+26. [docs/runbooks/CI.md](docs/runbooks/CI.md) — jobs, test-service boundary, локальное воспроизведение и failure handling.
+27. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+28. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -117,6 +118,16 @@ pnpm benchmark:ai --provider fake --model fixture-analysis-v1 --dataset fixtures
 
 Fake доказывает работу harness, validity/failure paths и отсутствие label leakage, но не качество реальной модели. Определения метрик и внешний 8B/14B protocol — в [benchmark runbook](docs/runbooks/AI_BENCHMARK.md).
 
+Выбранный Ollama сначала проверяется без генерации:
+
+```powershell
+$env:AI_PROVIDER = "ollama"
+$env:OLLAMA_MODEL = "deepseek-r1:8b"
+pnpm ai:health
+```
+
+`OllamaAIProvider` не активируется без явного выбора, не скачивает модель и по умолчанию принимает только loopback origin. Полный сетевой и benchmark-контракт описан в [Ollama runbook](docs/runbooks/OLLAMA_INTEGRATION.md).
+
 ## Telegram UI
 
 Бот запускается отдельным процессом и требует мигрированную PostgreSQL, заранее зарегистрированный Telegram user ID и локальный `TELEGRAM_BOT_TOKEN`:
@@ -154,9 +165,9 @@ pnpm db:verify-backup
 
 Команды создают encrypted environment-scoped artifact и фактически восстанавливают его во временную БД. Полный recovery-процесс описан в [backup/restore runbook](docs/runbooks/BACKUP_RESTORE.md).
 
-## Ближайший технический результат
+## Ближайший проверяемый результат
 
-Реализовать локальную часть `ART-025 Denis-PC/Ollama integration contract`: bounded `OllamaAIProvider`, conditional config, health/security runbook и offline adapter tests. Реальный smoke и одинаковое сравнение 8B/14B остаются внешним evidence Gate G1.
+На физически доступном private inference-host выполнить health и одинаковые full benchmark-прогоны DeepSeek-R1 8B/14B, приложить измеренный VRAM и зафиксировать выбор модели по качеству плюс capacity. Отдельно собрать target-host backup/reboot evidence для Gate G5; отсутствие этих данных не меняет локальную готовность ART-025.
 
 ## Источники планирования
 

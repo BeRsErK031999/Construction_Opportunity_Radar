@@ -4,7 +4,7 @@
 
 `benchmark:ai` запускает один выбранный `AIProvider` на неизменном `eval-gold/v1` и печатает строгий JSON-отчёт `ai-benchmark-report/v1`. Команда нужна для воспроизводимого сравнения provider/model при одинаковых dataset hash, split, prompt version, analysis version и structured schema.
 
-ART-020 подтверждает работу harness на `FakeAIProvider`. Он не подтверждает качество DeepSeek, скорость GPU или прохождение Gate G1: реальные одинаковые прогоны 8B и 14B остаются внешним evidence после подключения Ollama adapter и inference-host.
+ART-020 подтверждает работу harness на `FakeAIProvider`. ART-025 подключает offline-проверенный `OllamaAIProvider`, но не подтверждает качество DeepSeek, скорость GPU или прохождение Gate G1: реальные одинаковые прогоны 8B и 14B остаются внешним evidence на inference-host.
 
 ## Запуск
 
@@ -16,14 +16,16 @@ pnpm benchmark:ai --provider fake --model fixture-analysis-v1 --dataset fixtures
 
 Поддерживаемые параметры:
 
-- `--provider`: сейчас только `fake`; неизвестный provider завершает команду с ошибкой;
-- `--model`: ожидаемая model identity, для fake по умолчанию `fixture-analysis-v1`;
+- `--provider`: `fake` или `ollama`; неизвестный provider завершает команду с ошибкой;
+- `--model`: ожидаемая model identity; для fake без флага используется `fixture-analysis-v1`, для Ollama tag обязателен через флаг или `OLLAMA_MODEL`;
 - `--dataset`: путь к JSON; по умолчанию versioned `fixtures/evals/v1/dataset.json`;
 - `--split`: `all`, `calibration` или `holdout`;
 - `--prompt-version`: version identity, по умолчанию `benchmark-prompt/v1`;
 - `--vram-peak-mib`: необязательное положительное число только для независимо измеренного peak VRAM.
 
 JSON пишется в stdout. Configuration/dataset errors пишутся в stderr и дают ненулевой exit code. Отчёт не сохраняется автоматически и не изменяет PostgreSQL.
+
+Перед реальным прогоном выполните `pnpm ai:health` и следуйте private-network/config protocol из [OLLAMA_INTEGRATION.md](OLLAMA_INTEGRATION.md). Ollama token counts и generation duration берутся из non-streaming response автоматически; measured peak VRAM по-прежнему передаётся отдельно.
 
 ## Input boundary
 

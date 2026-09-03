@@ -28,7 +28,7 @@ healthCheck() -> HEALTHY | UNHEALTHY with safe failure metadata
 modelInfo() -> provider/model, capabilities, maxInputCharacters
 ```
 
-The port returns domain `Analysis`. Since `ART-012`, `FakeAIProvider` first generates an `ai-analysis/v1` response and passes it through the shared schema, request-identity, provenance, and domain mapper. The fake therefore exercises the same validation boundary intended for the later Ollama adapter.
+The port returns domain `Analysis`. Since `ART-012`, `FakeAIProvider` first generates an `ai-analysis/v1` response and passes it through the shared schema, request-identity, provenance, and domain mapper. `OllamaAIProvider` now uses that same validation boundary; the fake remains the network-free default.
 
 ## Deterministic fake modes
 

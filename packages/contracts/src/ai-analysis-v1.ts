@@ -149,4 +149,8 @@ export const AIAnalysisResponseV1Schema = z
     }
   });
 
+export const AI_ANALYSIS_RESPONSE_JSON_SCHEMA_V1 = Object.freeze(
+  z.toJSONSchema(AIAnalysisResponseV1Schema),
+);
+
 export type AIAnalysisResponseV1 = z.infer<typeof AIAnalysisResponseV1Schema>;

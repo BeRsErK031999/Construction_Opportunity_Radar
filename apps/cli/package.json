@@ -7,6 +7,7 @@
     "@radar/ai-adapters": "workspace:*",
     "@radar/application": "workspace:*",
     "@radar/contracts": "workspace:*",
+    "@radar/config": "workspace:*",
     "@radar/core": "workspace:*",
     "@radar/db": "workspace:*",
     "@radar/evals": "workspace:*",

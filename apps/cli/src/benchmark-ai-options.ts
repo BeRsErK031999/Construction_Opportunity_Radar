@@ -2,12 +2,14 @@ import { AI_BENCHMARK_PROMPT_VERSION_V1, type AIBenchmarkSplit } from "@radar/ev
 
 export interface AIBenchmarkCliOptions {
   readonly dataset: string | null;
-  readonly model: string;
+  readonly model: string | null;
   readonly promptVersion: string;
-  readonly provider: string;
+  readonly provider: AIBenchmarkProvider;
   readonly selectedSplit: AIBenchmarkSplit;
   readonly vramPeakMiB: number | null;
 }
+
+export type AIBenchmarkProvider = "fake" | "ollama";
 
 const optionValue = (
   argument: string,
@@ -53,13 +55,21 @@ const positiveNumber = (value: string, name: string): number => {
   return parsed;
 };
 
+const providerFrom = (value: string): AIBenchmarkProvider => {
+  const normalized = value.trim().toLocaleLowerCase("en-US");
+  if (normalized !== "fake" && normalized !== "ollama") {
+    throw new Error("--provider must be fake or ollama");
+  }
+  return normalized;
+};
+
 export const parseAIBenchmarkCliOptions = (
   argumentsList: readonly string[],
 ): AIBenchmarkCliOptions => {
   let dataset: string | null = null;
-  let model = "fixture-analysis-v1";
+  let model: string | null = null;
   let promptVersion: string = AI_BENCHMARK_PROMPT_VERSION_V1;
-  let provider = "fake";
+  let provider: AIBenchmarkProvider = "fake";
   let selectedSplit: AIBenchmarkSplit = "ALL";
   let vramPeakMiB: number | null = null;
   const seen = new Set<string>();
@@ -86,7 +96,7 @@ export const parseAIBenchmarkCliOptions = (
         promptVersion = nonBlank(option.value, option.name, 100);
         break;
       case "provider":
-        provider = nonBlank(option.value, option.name, 100);
+        provider = providerFrom(option.value);
         break;
       case "split":
         selectedSplit = splitFrom(option.value);
