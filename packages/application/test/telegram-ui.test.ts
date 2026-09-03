@@ -28,6 +28,7 @@ import {
   getTelegramUserProfile,
   submitTelegramDeliveryFeedback,
   type DeliveryPort,
+  type OperationalEvent,
   type BotApplicationError,
   type TelegramUiRepositories,
 } from "../src/index.js";
@@ -277,6 +278,7 @@ describe("Telegram UI application use cases", () => {
   it("delivers one opportunity exactly once for a replayed Telegram update", async () => {
     const testState = state();
     const sent: unknown[] = [];
+    const events: OperationalEvent[] = [];
     const port: DeliveryPort = {
       sendOpportunity(input) {
         sent.push(input);
@@ -288,6 +290,7 @@ describe("Telegram UI application use cases", () => {
       interactionId: "update-42",
       mode: "NEW" as const,
       now: () => NOW,
+      observer: { observe: (event: OperationalEvent) => events.push(event) },
       port,
       repositories: testState.repositories,
       telegramUserId: user.telegramUserId,
@@ -300,10 +303,26 @@ describe("Telegram UI application use cases", () => {
     expect(replayed.deliveries[0]?.id).toBe(first.deliveries[0]?.id);
     expect(sent).toHaveLength(1);
     expect(testState.deliveries.size).toBe(1);
+    expect(events).toEqual([
+      expect.objectContaining({
+        correlationId: CORRELATION_ID,
+        kind: "OPPORTUNITY",
+        name: "delivery_completed",
+        outcome: "SENT",
+        reused: false,
+      }),
+      expect.objectContaining({
+        kind: "OPPORTUNITY",
+        name: "delivery_completed",
+        outcome: "SENT",
+        reused: true,
+      }),
+    ]);
   });
 
   it("persists a safe failed outcome when the transport rejects a card", async () => {
     const testState = state();
+    const events: OperationalEvent[] = [];
     const port: DeliveryPort = {
       sendOpportunity() {
         throw new DeliveryTransportError(
@@ -319,6 +338,7 @@ describe("Telegram UI application use cases", () => {
       interactionId: "update-43",
       mode: "NEW",
       now: () => NOW,
+      observer: { observe: (event: OperationalEvent) => events.push(event) },
       port,
       repositories: testState.repositories,
       telegramUserId: user.telegramUserId,
@@ -329,6 +349,14 @@ describe("Telegram UI application use cases", () => {
       failureReason: "Telegram временно недоступен",
       status: "FAILED",
     });
+    expect(events).toEqual([
+      expect.objectContaining({
+        failureCode: "TELEGRAM_UNAVAILABLE",
+        name: "delivery_completed",
+        outcome: "FAILED",
+        reused: false,
+      }),
+    ]);
   });
 
   it("attaches idempotent callback feedback to the sent delivery", async () => {

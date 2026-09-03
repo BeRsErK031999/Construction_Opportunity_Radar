@@ -11,4 +11,5 @@ export * from "./ingestion/ingest-source.js";
 export * from "./normalization/normalize-raw-item.js";
 export * from "./offline/process-offline-pipeline.js";
 export * from "./ports/ai-provider.js";
+export * from "./ports/operational-observer.js";
 export * from "./ports/source-adapter.js";

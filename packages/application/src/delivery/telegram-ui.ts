@@ -34,6 +34,10 @@ import {
   type DigestRepository,
   type DigestView,
 } from "../digest/digest.js";
+import {
+  observeOperationalEvent,
+  type OperationalObserver,
+} from "../ports/operational-observer.js";
 
 export const TELEGRAM_FEEDBACK_ACTIONS = [
   "USEFUL",
@@ -156,6 +160,7 @@ export const deliverTelegramDigest = async (input: {
   readonly digestId: DigestId;
   readonly kind: DigestKind;
   readonly now: () => string;
+  readonly observer?: OperationalObserver;
   readonly port: DigestDeliveryPort;
   readonly repositories: Pick<TelegramUiRepositories, "digestDeliveries" | "digests" | "users">;
   readonly telegramUserId: string;
@@ -172,6 +177,16 @@ export const deliverTelegramDigest = async (input: {
     userId: user.id,
   });
   if (input.kind === "DAILY" && built.view.items.length === 0) {
+    observeOperationalEvent(input.observer, {
+      correlationId: input.correlationId,
+      deliveryId: null,
+      failureCode: null,
+      kind: "DIGEST",
+      name: "delivery_completed",
+      opportunities: 0,
+      outcome: "SKIPPED",
+      reused: false,
+    });
     return Object.freeze({
       delivery: null,
       deliveryCreated: false,
@@ -185,6 +200,16 @@ export const deliverTelegramDigest = async (input: {
     built.view.digest.id,
   );
   if (existing !== null) {
+    observeOperationalEvent(input.observer, {
+      correlationId: existing.correlationId,
+      deliveryId: existing.id,
+      failureCode: existing.status === "FAILED" ? existing.failureCode : null,
+      kind: "DIGEST",
+      name: "delivery_completed",
+      opportunities: built.view.items.length,
+      outcome: existing.status,
+      reused: true,
+    });
     return Object.freeze({
       delivery: existing,
       deliveryCreated: false,
@@ -205,6 +230,17 @@ export const deliverTelegramDigest = async (input: {
     }),
   );
   if (!savedPending.created) {
+    observeOperationalEvent(input.observer, {
+      correlationId: savedPending.delivery.correlationId,
+      deliveryId: savedPending.delivery.id,
+      failureCode:
+        savedPending.delivery.status === "FAILED" ? savedPending.delivery.failureCode : null,
+      kind: "DIGEST",
+      name: "delivery_completed",
+      opportunities: built.view.items.length,
+      outcome: savedPending.delivery.status,
+      reused: true,
+    });
     return Object.freeze({
       delivery: savedPending.delivery,
       deliveryCreated: false,
@@ -221,6 +257,16 @@ export const deliverTelegramDigest = async (input: {
     const saved = await input.repositories.digestDeliveries.save(
       markDigestDeliverySent(savedPending.delivery, sent.providerMessageId, input.now()),
     );
+    observeOperationalEvent(input.observer, {
+      correlationId: saved.delivery.correlationId,
+      deliveryId: saved.delivery.id,
+      failureCode: null,
+      kind: "DIGEST",
+      name: "delivery_completed",
+      opportunities: built.view.items.length,
+      outcome: "SENT",
+      reused: false,
+    });
     return Object.freeze({
       delivery: saved.delivery,
       deliveryCreated: true,
@@ -238,6 +284,16 @@ export const deliverTelegramDigest = async (input: {
         input.now(),
       ),
     );
+    observeOperationalEvent(input.observer, {
+      correlationId: saved.delivery.correlationId,
+      deliveryId: saved.delivery.id,
+      failureCode: failure.code,
+      kind: "DIGEST",
+      name: "delivery_completed",
+      opportunities: built.view.items.length,
+      outcome: "FAILED",
+      reused: false,
+    });
     return Object.freeze({
       delivery: saved.delivery,
       deliveryCreated: true,
@@ -292,6 +348,7 @@ const deliverOpportunity = async (input: {
   readonly deliveryId: DeliveryId;
   readonly idempotencyKey: string;
   readonly now: () => string;
+  readonly observer?: OperationalObserver;
   readonly opportunity: SignalOpportunity;
   readonly port: DeliveryPort;
   readonly recipientExternalId: string;
@@ -300,6 +357,16 @@ const deliverOpportunity = async (input: {
 }): Promise<Delivery> => {
   const existing = await input.repository.findByIdempotencyKey("TELEGRAM", input.idempotencyKey);
   if (existing !== null) {
+    observeOperationalEvent(input.observer, {
+      correlationId: existing.correlationId,
+      deliveryId: existing.id,
+      failureCode: existing.status === "FAILED" ? existing.failureCode : null,
+      kind: "OPPORTUNITY",
+      name: "delivery_completed",
+      opportunities: 1,
+      outcome: existing.status,
+      reused: true,
+    });
     return existing;
   }
   const pending = createPendingDelivery({
@@ -328,14 +395,36 @@ const deliverOpportunity = async (input: {
       },
       recipientExternalId: input.recipientExternalId,
     });
-    return await input.repository.save(
+    const saved = await input.repository.save(
       markDeliverySent(pending, sent.providerMessageId, input.now()),
     );
+    observeOperationalEvent(input.observer, {
+      correlationId: saved.correlationId,
+      deliveryId: saved.id,
+      failureCode: null,
+      kind: "OPPORTUNITY",
+      name: "delivery_completed",
+      opportunities: 1,
+      outcome: "SENT",
+      reused: false,
+    });
+    return saved;
   } catch (error) {
     const failure = safeDeliveryFailure(error);
-    return input.repository.save(
+    const saved = await input.repository.save(
       markDeliveryFailed(pending, failure.code, failure.reason, input.now()),
     );
+    observeOperationalEvent(input.observer, {
+      correlationId: saved.correlationId,
+      deliveryId: saved.id,
+      failureCode: failure.code,
+      kind: "OPPORTUNITY",
+      name: "delivery_completed",
+      opportunities: 1,
+      outcome: "FAILED",
+      reused: false,
+    });
+    return saved;
   }
 };
 
@@ -350,6 +439,7 @@ export const deliverTelegramOpportunities = async (input: {
   readonly limit?: number;
   readonly mode: "NEW" | "SAVED";
   readonly now: () => string;
+  readonly observer?: OperationalObserver;
   readonly port: DeliveryPort;
   readonly repositories: Pick<TelegramUiRepositories, "deliveries" | "saved" | "signals" | "users">;
   readonly telegramUserId: string;
@@ -375,6 +465,7 @@ export const deliverTelegramOpportunities = async (input: {
         deliveryId: input.deliveryIdFactory(),
         idempotencyKey: `${input.interactionId}:${opportunity.recommendation.id}`,
         now: input.now,
+        ...(input.observer === undefined ? {} : { observer: input.observer }),
         opportunity,
         port: input.port,
         recipientExternalId: input.telegramUserId,

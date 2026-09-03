@@ -12,7 +12,7 @@ import {
   PrismaSignalOpportunityRepository,
 } from "@radar/db";
 import { TelegramDeliveryAdapter, type TelegramMessageClient } from "@radar/delivery-adapters";
-import { createLogger } from "@radar/observability";
+import { createLogger, createOperationalTelemetry } from "@radar/observability";
 
 import { buildRadarBot } from "./bot.js";
 
@@ -32,6 +32,7 @@ export const runBot = async (): Promise<void> => {
     service: "bot",
   });
   const client = createDatabaseClient(config.databaseUrl);
+  const telemetry = createOperationalTelemetry({ logger });
   const profiles = new PrismaProfileRegistrationRepository(client);
   const signals = new PrismaSignalOpportunityRepository(client);
   const botReference: { current?: ReturnType<typeof buildRadarBot> } = {};
@@ -60,6 +61,7 @@ export const runBot = async (): Promise<void> => {
   const running = buildRadarBot({
     deliveryPort: new TelegramDeliveryAdapter(telegramClient),
     logger,
+    observer: telemetry,
     repositories: {
       digestDeliveries: new PrismaDigestDeliveryRepository(client),
       digests: new PrismaDigestRepository(client),
@@ -81,9 +83,9 @@ export const runBot = async (): Promise<void> => {
       return;
     }
     stopping = true;
-    logger.info({ event: "telegram.stopping", signal }, "Stopping Telegram bot");
+    logger.info({ event: "telegram_stopping", signal }, "Stopping Telegram bot");
     void running.bot.stop().catch((error: unknown) => {
-      logger.error({ err: error, event: "telegram.stop_failed" }, "Telegram bot stop failed");
+      logger.error({ err: error, event: "telegram_stop_failed" }, "Telegram bot stop failed");
     });
   };
   for (const signal of SHUTDOWN_SIGNALS) {
@@ -101,7 +103,7 @@ export const runBot = async (): Promise<void> => {
           { command: "opportunities", description: "Показать новые возможности" },
           { command: "help", description: "Как пользоваться радаром" },
         ]);
-        logger.info({ event: "telegram.started" }, "Telegram bot started");
+        logger.info({ event: "telegram_started" }, "Telegram bot started");
       },
       timeout: config.pollingTimeoutSeconds,
     });
@@ -110,14 +112,18 @@ export const runBot = async (): Promise<void> => {
       process.removeListener(signal, handler);
     }
     await client.$disconnect();
-    logger.info({ event: "telegram.stopped" }, "Telegram bot stopped");
+    logger.info(
+      { event: "operational_metrics_snapshot", metrics: telemetry.metricsSnapshot() },
+      "Final operational metrics snapshot",
+    );
+    logger.info({ event: "telegram_stopped" }, "Telegram bot stopped");
   }
 };
 
 if (isMainModule(import.meta.url)) {
   const bootstrapLogger = createLogger({ level: "info", service: "bot-bootstrap" });
   void runBot().catch((error: unknown) => {
-    bootstrapLogger.fatal({ err: error, event: "telegram.start_failed" }, "Bot failed to start");
+    bootstrapLogger.fatal({ err: error, event: "telegram_start_failed" }, "Bot failed to start");
     process.exitCode = 1;
   });
 }

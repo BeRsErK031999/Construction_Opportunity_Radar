@@ -5,7 +5,7 @@ import {
   type FixedIntervalJobSchedule,
   type PipelineJobOperations,
 } from "@radar/jobs";
-import { createLogger } from "@radar/observability";
+import { createLogger, createOperationalTelemetry } from "@radar/observability";
 
 import { startWorker, type RunningWorker } from "./lifecycle.js";
 
@@ -23,12 +23,14 @@ export const runWorker = async (options: RunWorkerOptions): Promise<RunningWorke
     service: "worker",
   });
   const client = createDatabaseClient(config.databaseUrl);
+  const telemetry = createOperationalTelemetry({ logger });
   await client.$connect();
 
   return startWorker({
     config,
     handlers: createPipelineJobHandlers(options.operations),
     logger,
+    observer: telemetry,
     onClose: () => client.$disconnect(),
     repository: new PrismaProcessingJobRepository(client),
     ...(options.schedules === undefined ? {} : { schedules: options.schedules }),

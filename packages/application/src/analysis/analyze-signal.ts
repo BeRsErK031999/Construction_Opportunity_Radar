@@ -7,6 +7,10 @@ import {
   type AIProviderErrorCode,
   type AIProviderModelInfo,
 } from "../ports/ai-provider.js";
+import {
+  observeOperationalEvent,
+  type OperationalObserver,
+} from "../ports/operational-observer.js";
 
 export interface AnalysisIdentity {
   readonly analysisVersion: string;
@@ -30,6 +34,7 @@ export interface AnalysisRepository {
 
 export interface ExecuteAIAnalysisInput {
   readonly modelInfo: AIProviderModelInfo;
+  readonly observer?: OperationalObserver;
   readonly provider: AIProvider;
   readonly repository: AnalysisRepository;
   readonly request: AIAnalysisRequest;
@@ -38,6 +43,25 @@ export interface ExecuteAIAnalysisInput {
 export interface ExecuteAIAnalysisResult extends AnalysisSaveResult {
   readonly providerCalled: boolean;
 }
+
+const observeAnalysis = (
+  input: ExecuteAIAnalysisInput,
+  result: ExecuteAIAnalysisResult,
+): ExecuteAIAnalysisResult => {
+  observeOperationalEvent(input.observer, {
+    analysisId: result.analysis.id,
+    correlationId: result.analysis.correlationId,
+    created: result.created,
+    failureCode: result.analysis.status === "FAILED" ? result.analysis.failureCode : null,
+    model: input.modelInfo.model,
+    name: "ai_analysis_completed",
+    provider: input.modelInfo.provider,
+    providerCalled: result.providerCalled,
+    signalId: result.analysis.signalId,
+    status: result.analysis.status,
+  });
+  return result;
+};
 
 const identityFrom = (
   request: AIAnalysisRequest,
@@ -112,7 +136,10 @@ export const executeAIAnalysis = async (
   const identity = identityFrom(input.request, input.modelInfo);
   const existing = await input.repository.findByIdentity(identity);
   if (existing !== null) {
-    return Object.freeze({ analysis: existing, created: false, providerCalled: false });
+    return observeAnalysis(
+      input,
+      Object.freeze({ analysis: existing, created: false, providerCalled: false }),
+    );
   }
 
   let analysis: Analysis;
@@ -139,5 +166,5 @@ export const executeAIAnalysis = async (
   }
 
   const saved = await input.repository.save(analysis);
-  return Object.freeze({ ...saved, providerCalled: true });
+  return observeAnalysis(input, Object.freeze({ ...saved, providerCalled: true }));
 };

@@ -46,7 +46,7 @@ export const runApi = async (): Promise<void> => {
 if (isMainModule(import.meta.url)) {
   const bootstrapLogger = createLogger({ level: "info", service: "api-bootstrap" });
   void runApi().catch((error: unknown) => {
-    bootstrapLogger.fatal({ err: error, event: "api.start_failed" }, "API failed to start");
+    bootstrapLogger.fatal({ err: error, event: "api_start_failed" }, "API failed to start");
     process.exitCode = 1;
   });
 }

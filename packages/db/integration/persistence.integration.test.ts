@@ -20,6 +20,7 @@ import {
   submitTelegramDeliveryFeedback,
   type Classifier,
   type Deduplicator,
+  type OperationalEvent,
   type RawItemNormalizer,
 } from "@radar/application";
 import { FakeAIProvider } from "@radar/ai-adapters";
@@ -660,6 +661,7 @@ describe("PostgreSQL persistence", () => {
     const dataset = await loadFixtureDataset(fixturePath);
     const sources = createFixtureSources(dataset);
     const client = database();
+    const operationalEvents: OperationalEvent[] = [];
     const repositories = {
       analyses: new PrismaAnalysisRepository(client),
       classification: new PrismaClassificationRepository(client),
@@ -684,6 +686,7 @@ describe("PostgreSQL persistence", () => {
       },
       identityNamespace: dataset.datasetId,
       normalizer: { normalize: normalizeRawItemV1, version: NORMALIZER_VERSION_V1 },
+      observer: { observe: (event: OperationalEvent) => operationalEvents.push(event) },
       profiles: testProfiles(),
       promptVersion: "fixture-prompt-v1",
       provider: new FakeAIProvider(),
@@ -723,6 +726,25 @@ describe("PostgreSQL persistence", () => {
       normalization: { created: 0, existing: 200, normalizedItems: 200 },
       scoring: { created: 0, existing: 110, recommendations: 110 },
     });
+    expect(
+      operationalEvents.filter(({ name }) => name === "pipeline_stage_completed"),
+    ).toHaveLength(12);
+    expect(operationalEvents.filter(({ name }) => name === "pipeline_run_completed")).toHaveLength(
+      2,
+    );
+    expect(
+      operationalEvents.filter(({ name }) => name === "source_ingestion_completed"),
+    ).toHaveLength(20);
+    expect(operationalEvents.filter(({ name }) => name === "ai_analysis_completed")).toHaveLength(
+      220,
+    );
+    const rawItemEvent = operationalEvents.find(
+      (event): event is Extract<OperationalEvent, { readonly name: "raw_item_ingested" }> =>
+        event.name === "raw_item_ingested",
+    );
+    expect(rawItemEvent?.correlationId.length).toBeGreaterThan(0);
+    expect(rawItemEvent?.rawItemId.length).toBeGreaterThan(0);
+    expect(rawItemEvent?.sourceId.length).toBeGreaterThan(0);
     expect(
       await client.analysis.count({
         where: { sources: { some: { source: { aiProcessingAllowed: false } } } },

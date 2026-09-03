@@ -11,6 +11,38 @@ export interface JobRuntimeLogger {
   warn(bindings: object, message: string): void;
 }
 
+export type JobRuntimeEvent =
+  | {
+      readonly attempt: number;
+      readonly correlationId: string;
+      readonly jobId: string;
+      readonly jobType: ProcessingJob["type"];
+      readonly name: "job_started";
+    }
+  | {
+      readonly attempt: number;
+      readonly correlationId: string;
+      readonly errorCode: string | null;
+      readonly jobId: string;
+      readonly jobType: ProcessingJob["type"];
+      readonly name: "job_completed";
+      readonly outcome: "RETRY_SCHEDULED" | "SUCCEEDED" | "TERMINAL_FAILURE";
+    }
+  | {
+      readonly failed: number;
+      readonly name: "stale_jobs_recovered";
+      readonly requeued: number;
+    }
+  | {
+      readonly created: number;
+      readonly name: "job_schedules_evaluated";
+      readonly overlapBlocked: number;
+    };
+
+export interface JobRuntimeObserver {
+  observeJob(event: JobRuntimeEvent): void;
+}
+
 export interface JobRuntimeClock {
   now(): Date;
 }
@@ -25,6 +57,7 @@ export interface RunJobCycleInput {
   readonly handlers: JobHandlerRegistry;
   readonly leaseTimeoutMs: number;
   readonly logger?: JobRuntimeLogger;
+  readonly observer?: JobRuntimeObserver;
   readonly repository: ProcessingJobRepository;
   readonly retryPolicy: JobRetryPolicy;
   readonly staleRecoveryLimit: number;
@@ -51,6 +84,14 @@ const noOpLogger: JobRuntimeLogger = Object.freeze({
   info: () => undefined,
   warn: () => undefined,
 });
+
+const observeJob = (observer: JobRuntimeObserver | undefined, event: JobRuntimeEvent): void => {
+  try {
+    observer?.observeJob(Object.freeze(event));
+  } catch {
+    // Telemetry must never change job execution.
+  }
+};
 
 const isoAfter = (at: Date, milliseconds: number): string =>
   new Date(at.getTime() + milliseconds).toISOString();
@@ -112,12 +153,17 @@ export const runJobCycle = async (input: RunJobCycleInput): Promise<RunJobCycleR
   if (recovered.jobs.length > 0) {
     logger.warn(
       {
-        event: "jobs.stale_recovered",
+        event: "stale_jobs_recovered",
         failed: recovered.failed,
         requeued: recovered.requeued,
       },
       "Recovered stale jobs",
     );
+    observeJob(input.observer, {
+      failed: recovered.failed,
+      name: "stale_jobs_recovered",
+      requeued: recovered.requeued,
+    });
   }
 
   const job = await input.repository.claimNext({
@@ -131,14 +177,21 @@ export const runJobCycle = async (input: RunJobCycleInput): Promise<RunJobCycleR
   logger.info(
     {
       attempt: job.attempts,
-      correlationId: job.correlationId,
-      entityKey: job.entityKey,
-      event: "job.started",
-      jobId: job.id,
-      jobType: job.type,
+      correlation_id: job.correlationId,
+      entity_key: job.entityKey,
+      event: "job_started",
+      job_id: job.id,
+      job_type: job.type,
     },
     "Started job",
   );
+  observeJob(input.observer, {
+    attempt: job.attempts,
+    correlationId: job.correlationId,
+    jobId: job.id,
+    jobType: job.type,
+    name: "job_started",
+  });
 
   const renewLease = async (): Promise<boolean> => {
     const now = clock.now();
@@ -169,13 +222,22 @@ export const runJobCycle = async (input: RunJobCycleInput): Promise<RunJobCycleR
     logger.info(
       {
         attempt: completed.attempts,
-        correlationId: completed.correlationId,
-        event: "job.succeeded",
-        jobId: completed.id,
-        jobType: completed.type,
+        correlation_id: completed.correlationId,
+        event: "job_succeeded",
+        job_id: completed.id,
+        job_type: completed.type,
       },
       "Completed job",
     );
+    observeJob(input.observer, {
+      attempt: completed.attempts,
+      correlationId: completed.correlationId,
+      errorCode: null,
+      jobId: completed.id,
+      jobType: completed.type,
+      name: "job_completed",
+      outcome: "SUCCEEDED",
+    });
     return Object.freeze({ job: completed, outcome: "SUCCEEDED", recovered });
   } catch (error) {
     const failedAt = clock.now();
@@ -191,11 +253,11 @@ export const runJobCycle = async (input: RunJobCycleInput): Promise<RunJobCycleR
     });
     const bindings = {
       attempt: failed.job.attempts,
-      correlationId: failed.job.correlationId,
-      errorCode: failure.code,
-      event: failed.outcome === "RETRY_SCHEDULED" ? "job.retry_scheduled" : "job.failed",
-      jobId: failed.job.id,
-      jobType: failed.job.type,
+      correlation_id: failed.job.correlationId,
+      error_code: failure.code,
+      event: failed.outcome === "RETRY_SCHEDULED" ? "job_retry_scheduled" : "job_failed",
+      job_id: failed.job.id,
+      job_type: failed.job.type,
       retryable: failure.retryable,
     };
     if (failed.outcome === "RETRY_SCHEDULED") {
@@ -203,6 +265,15 @@ export const runJobCycle = async (input: RunJobCycleInput): Promise<RunJobCycleR
     } else {
       logger.error(bindings, "Job reached terminal failure");
     }
+    observeJob(input.observer, {
+      attempt: failed.job.attempts,
+      correlationId: failed.job.correlationId,
+      errorCode: failure.code,
+      jobId: failed.job.id,
+      jobType: failed.job.type,
+      name: "job_completed",
+      outcome: failed.outcome,
+    });
     return Object.freeze({ job: failed.job, outcome: failed.outcome, recovered });
   }
 };
@@ -220,9 +291,20 @@ export const runJobLoop = async (input: RunJobLoopInput): Promise<void> => {
       });
       if (scheduled.created > 0 || scheduled.overlapBlocked > 0) {
         (input.logger ?? noOpLogger).info(
-          { event: "jobs.scheduled", ...scheduled },
+          {
+            created: scheduled.created,
+            event: "job_schedules_evaluated",
+            existing: scheduled.existing,
+            not_started: scheduled.notStarted,
+            overlap_blocked: scheduled.overlapBlocked,
+          },
           "Evaluated job schedules",
         );
+        observeJob(input.observer, {
+          created: scheduled.created,
+          name: "job_schedules_evaluated",
+          overlapBlocked: scheduled.overlapBlocked,
+        });
       }
     }
     const result = await runJobCycle(input);

@@ -4,7 +4,7 @@
 
 ## Статус
 
-`ART-004`–`ART-020` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set и provider-neutral benchmark report. Следующий critical-path пункт — `ART-021 Observability`.
+`ART-004`–`ART-021` реализуют полный независимый от реальной модели контур: PostgreSQL persistence, идемпотентные fixtures, versioned normalization, exact/near deduplication, классификацию без AI, строгий `ai-analysis/v1`, validated `FakeAIProvider`, profile-specific Opportunity Score, private Fastify API v1, Telegram UI, feedback loop, versioned Digest, durable job runtime, отдельный 200-item eval gold set, provider-neutral benchmark report и единый operational telemetry contract. Следующий critical-path пункт — `ART-022 Security hardening`.
 
 Первый продуктовый контур:
 
@@ -36,8 +36,10 @@
 17. [docs/runbooks/DURABLE_JOBS.md](docs/runbooks/DURABLE_JOBS.md) — job states, scheduler windows, claim/lease/retry/recovery и операционная диагностика.
 18. [docs/runbooks/EVAL_GOLD_SET.md](docs/runbooks/EVAL_GOLD_SET.md) — контракт, provenance, splits и проверки отдельного gold set.
 19. [docs/runbooks/AI_BENCHMARK.md](docs/runbooks/AI_BENCHMARK.md) — запуск, метрики, label boundary и правила одинакового сравнения моделей.
-20. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
-21. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
+20. [docs/observability/README.md](docs/observability/README.md) — единый logging-контракт, process events и correlation context.
+21. [docs/runbooks/OBSERVABILITY.md](docs/runbooks/OBSERVABILITY.md) — counters, snapshot, cardinality и локальная диагностика.
+22. [ROADMAP.md](ROADMAP.md) — последовательность ART-задач до подключения inference-компьютера.
+23. [docs/quality/QUALITY_GATES.md](docs/quality/QUALITY_GATES.md) — gates, KPI и Definition of Done.
 
 Repo-scoped skills:
 
@@ -135,7 +137,7 @@ pnpm db:validate
 
 ## Ближайший технический результат
 
-Реализовать `ART-021`: унифицировать structured events, correlation context и счётчики ingestion/pipeline/AI/delivery без обязательного Grafana. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
+Реализовать `ART-022`: проверить threat baseline, secrets, least privilege, auth/rate limits, dependency exposure и log redaction перед production-like запуском. Внешнее сравнение 8B/14B остаётся отдельным evidence Gate G1.
 
 ## Источники планирования
 

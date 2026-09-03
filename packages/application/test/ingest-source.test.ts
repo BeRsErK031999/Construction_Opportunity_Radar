@@ -2,6 +2,7 @@ import {
   type RawItemIngestResult,
   type RawItemRepository,
   type SourceAdapter,
+  type OperationalEvent,
 } from "@radar/application";
 import {
   createSource,
@@ -104,16 +105,20 @@ describe("ingestSource", () => {
     const rawItems = new MemoryRawItemRepository();
     const selectedAdapter = adapter();
     const identityFactory = identities();
+    const events: OperationalEvent[] = [];
+    const observer = { observe: (event: OperationalEvent) => events.push(event) };
 
     const first = await ingestSource({
       adapter: selectedAdapter,
       identities: identityFactory,
+      observer,
       rawItems,
       source: source(),
     });
     const second = await ingestSource({
       adapter: selectedAdapter,
       identities: identityFactory,
+      observer,
       rawItems,
       source: source(),
     });
@@ -127,6 +132,21 @@ describe("ingestSource", () => {
       rawPayload: { preserved: true },
       rawText: "  Raw fixture evidence  ",
       receivedAt: "2026-09-01T00:02:00.000Z",
+    });
+    expect(events.map(({ name }) => name)).toEqual([
+      "raw_item_ingested",
+      "raw_item_ingested",
+      "source_ingestion_completed",
+      "raw_item_ingested",
+      "raw_item_ingested",
+      "source_ingestion_completed",
+    ]);
+    expect(events[0]).toMatchObject({
+      aiProcessingAllowed: true,
+      correlationId: rawItems.items[0]?.correlationId,
+      outcome: "CREATED",
+      rawItemId: rawItems.items[0]?.id,
+      sourceId: "fixture-source-1",
     });
   });
 
@@ -147,6 +167,22 @@ describe("ingestSource", () => {
 
     expect(result.created).toBe(2);
     expect(result.aiProcessingPermittedRawItemIds).toEqual([]);
+  });
+
+  it("keeps the ingestion outcome when an observer fails", async () => {
+    const result = await ingestSource({
+      adapter: adapter(),
+      identities: identities(),
+      observer: {
+        observe() {
+          throw new Error("telemetry unavailable");
+        },
+      },
+      rawItems: new MemoryRawItemRepository(),
+      source: source(),
+    });
+
+    expect(result).toMatchObject({ candidates: 2, created: 2, existing: 0 });
   });
 
   it.each([

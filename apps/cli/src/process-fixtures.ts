@@ -30,6 +30,7 @@ import {
   PrismaRecommendationRepository,
   PrismaSourceRepository,
 } from "@radar/db";
+import { createLogger, createOperationalTelemetry } from "@radar/observability";
 import {
   createFixtureSources,
   FixtureSourceAdapter,
@@ -42,6 +43,12 @@ const fixturePath = new URL("../../../fixtures/ingestion/v1/dataset.json", impor
 const RUN_AT = "2026-09-10T00:00:00.000Z";
 const ANALYSIS_VERSION = "analysis-v1";
 const PROMPT_VERSION = "fixture-prompt-v1";
+const logger = createLogger({
+  destination: process.stderr,
+  level: "info",
+  service: "offline-cli",
+});
+const telemetry = createOperationalTelemetry({ logger });
 
 const normalizer: RawItemNormalizer = Object.freeze({
   normalize: normalizeRawItemV1,
@@ -125,6 +132,7 @@ const main = async (): Promise<void> => {
       deduplicator,
       identityNamespace: dataset.datasetId,
       normalizer,
+      observer: telemetry,
       profiles,
       promptVersion: PROMPT_VERSION,
       provider: new FakeAIProvider(),
@@ -152,6 +160,7 @@ const main = async (): Promise<void> => {
         promptVersion: PROMPT_VERSION,
         schemaVersion: AI_ANALYSIS_SCHEMA_VERSION_V1,
         ...summary,
+        metrics: telemetry.metricsSnapshot(),
       })}\n`,
     );
   } finally {
@@ -160,7 +169,6 @@ const main = async (): Promise<void> => {
 };
 
 void main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : "Unknown offline pipeline failure";
-  process.stderr.write(`Offline fixture pipeline failed: ${message}\n`);
+  logger.error({ err: error, event: "offline_pipeline_failed" }, "Offline pipeline failed");
   process.exitCode = 1;
 });

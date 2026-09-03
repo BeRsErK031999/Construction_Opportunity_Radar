@@ -10,6 +10,7 @@
     "@radar/core": "workspace:*",
     "@radar/db": "workspace:*",
     "@radar/evals": "workspace:*",
+    "@radar/observability": "workspace:*",
     "@radar/source-adapters": "workspace:*"
   }
 }

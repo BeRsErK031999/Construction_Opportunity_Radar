@@ -3,6 +3,7 @@ import {
   runJobLoop,
   type FixedIntervalJobSchedule,
   type JobHandlerRegistry,
+  type JobRuntimeObserver,
   type ProcessingJobRepository,
 } from "@radar/jobs";
 import type { AppLogger } from "@radar/observability";
@@ -16,6 +17,7 @@ export interface StartWorkerOptions {
   readonly handlers: JobHandlerRegistry;
   readonly installSignalHandlers?: boolean;
   readonly logger: AppLogger;
+  readonly observer?: JobRuntimeObserver & { metricsSnapshot?: () => unknown };
   readonly onClose?: () => Promise<void>;
   readonly repository: ProcessingJobRepository;
   readonly schedules?: readonly FixedIntervalJobSchedule[];
@@ -49,6 +51,7 @@ export const startWorker = (options: StartWorkerOptions): RunningWorker => {
     handlers: options.handlers,
     leaseTimeoutMs: options.config.jobLockTimeoutMs,
     logger: options.logger,
+    ...(options.observer === undefined ? {} : { observer: options.observer }),
     pollIntervalMs: options.config.jobPollIntervalMs,
     repository: options.repository,
     retryPolicy: {
@@ -69,10 +72,19 @@ export const startWorker = (options: StartWorkerOptions): RunningWorker => {
       return stopPromise;
     }
     stopPromise = (async () => {
-      options.logger.info({ event: "worker.stopping", reason }, "Stopping worker");
+      options.logger.info({ event: "worker_stopping", reason }, "Stopping worker");
       controller.abort(reason);
       await completion;
-      options.logger.info({ event: "worker.stopped", reason }, "Worker stopped");
+      if (options.observer?.metricsSnapshot !== undefined) {
+        options.logger.info(
+          {
+            event: "operational_metrics_snapshot",
+            metrics: options.observer.metricsSnapshot(),
+          },
+          "Final operational metrics snapshot",
+        );
+      }
+      options.logger.info({ event: "worker_stopped", reason }, "Worker stopped");
     })();
     return stopPromise;
   };
@@ -82,7 +94,7 @@ export const startWorker = (options: StartWorkerOptions): RunningWorker => {
       const handler = (): void => {
         void stop(signal).catch((error: unknown) => {
           options.logger.error(
-            { err: error, event: "worker.shutdown_failed", signal },
+            { err: error, event: "worker_shutdown_failed", signal },
             "Worker shutdown failed",
           );
           process.exitCode = 1;
@@ -94,7 +106,7 @@ export const startWorker = (options: StartWorkerOptions): RunningWorker => {
   }
 
   options.logger.info(
-    { event: "worker.started", workerId: options.config.workerId },
+    { event: "worker_started", worker_id: options.config.workerId },
     "Worker started",
   );
   return Object.freeze({ completion, stop });

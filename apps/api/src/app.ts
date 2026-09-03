@@ -258,7 +258,7 @@ export const buildApi = (options: BuildApiOptions) => {
             : new HttpApiError(500, "INTERNAL_ERROR", "Unexpected internal error");
     if (mapped.statusCode >= 500 && !(error instanceof HttpApiError)) {
       request.log.error(
-        { err: error, event: "api.request_failed", requestId: request.id },
+        { err: error, event: "api_request_failed", request_id: request.id },
         "API request failed",
       );
     }

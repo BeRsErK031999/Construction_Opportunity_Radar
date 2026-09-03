@@ -42,6 +42,10 @@ import {
 } from "../analysis/create-ai-analysis-request.js";
 import { type AIProvider } from "../ports/ai-provider.js";
 import {
+  observeOperationalEvent,
+  type OperationalObserver,
+} from "../ports/operational-observer.js";
+import {
   type IngestionIdentityFactory,
   type RawItemRepository,
   type SourceAdapter,
@@ -131,6 +135,7 @@ export interface ProcessOfflinePipelineInput {
   readonly identityNamespace: string;
   readonly limit?: number;
   readonly normalizer: RawItemNormalizer;
+  readonly observer?: OperationalObserver;
   readonly profiles: readonly OfflinePipelineProfile[];
   readonly promptVersion: string;
   readonly provider: AIProvider;
@@ -235,7 +240,66 @@ const successful = (
 const sum = <Item>(items: readonly Item[], value: (item: Item) => number): number =>
   items.reduce((total, item) => total + value(item), 0);
 
-export const processOfflinePipeline = async (
+const observePipelineSummary = (
+  observer: OperationalObserver | undefined,
+  runId: string,
+  summary: OfflinePipelineSummary,
+): void => {
+  const stages = [
+    {
+      created: summary.ingestion.created,
+      existing: summary.ingestion.existing,
+      input: summary.ingestion.candidates,
+      rejected: 0,
+      stage: "INGESTION",
+    },
+    {
+      created: summary.normalization.created,
+      existing: summary.normalization.existing,
+      input: summary.normalization.attempts,
+      rejected: summary.normalization.rejected,
+      stage: "NORMALIZATION",
+    },
+    {
+      created: summary.deduplication.created,
+      existing: summary.deduplication.existing,
+      input: summary.deduplication.assignments,
+      rejected: summary.deduplication.duplicates,
+      stage: "DEDUPLICATION",
+    },
+    {
+      created: summary.classification.created,
+      existing: summary.classification.existing,
+      input: summary.classification.inputClusters,
+      rejected: summary.classification.irrelevant + summary.classification.permissionDenied,
+      stage: "CLASSIFICATION",
+    },
+    {
+      created: summary.analysis.created,
+      existing: summary.analysis.existing,
+      input: summary.analysis.candidates,
+      rejected: summary.analysis.failed + summary.analysis.permissionRejected,
+      stage: "ANALYSIS",
+    },
+    {
+      created: summary.scoring.created,
+      existing: summary.scoring.existing,
+      input: summary.scoring.eligiblePairs,
+      rejected: summary.scoring.excluded,
+      stage: "SCORING",
+    },
+  ] as const;
+  for (const stage of stages) {
+    observeOperationalEvent(observer, {
+      ...stage,
+      name: "pipeline_stage_completed",
+      runId,
+    });
+  }
+  observeOperationalEvent(observer, { name: "pipeline_run_completed", runId });
+};
+
+const runOfflinePipeline = async (
   input: ProcessOfflinePipelineInput,
 ): Promise<OfflinePipelineSummary> => {
   const limit = input.limit ?? DEFAULT_LIMIT;
@@ -251,6 +315,7 @@ export const processOfflinePipeline = async (
       await ingestSource({
         adapter: input.adapter,
         identities,
+        ...(input.observer === undefined ? {} : { observer: input.observer }),
         rawItems: repositories.rawItems,
         source,
       }),
@@ -339,6 +404,7 @@ export const processOfflinePipeline = async (
       });
       const result = await executeAIAnalysis({
         modelInfo,
+        ...(input.observer === undefined ? {} : { observer: input.observer }),
         provider: input.provider,
         repository: repositories.analyses,
         request,
@@ -416,7 +482,7 @@ export const processOfflinePipeline = async (
     }
   }
 
-  return Object.freeze({
+  const summary = Object.freeze({
     analysis: Object.freeze({
       candidates: analysisCandidates.length,
       created: analyses.filter(({ created }) => created).length,
@@ -472,4 +538,21 @@ export const processOfflinePipeline = async (
       scored,
     }),
   });
+  observePipelineSummary(input.observer, input.identityNamespace, summary);
+  return summary;
+};
+
+export const processOfflinePipeline = async (
+  input: ProcessOfflinePipelineInput,
+): Promise<OfflinePipelineSummary> => {
+  try {
+    return await runOfflinePipeline(input);
+  } catch (error) {
+    observeOperationalEvent(input.observer, {
+      errorCode: error instanceof AIAnalysisRequestError ? error.code : "PIPELINE_INTERNAL_ERROR",
+      name: "pipeline_run_failed",
+      runId: input.identityNamespace,
+    });
+    throw error;
+  }
 };

@@ -5,6 +5,7 @@ import {
   type AIProvider,
   type AnalysisIdentity,
   type AnalysisRepository,
+  type OperationalEvent,
 } from "../src/index.js";
 import {
   analysisId,
@@ -81,9 +82,11 @@ describe("executeAIAnalysis", () => {
       modelInfo: () => Promise.resolve(modelInfo),
     };
     const repository = new InMemoryAnalysisRepository();
+    const events: OperationalEvent[] = [];
+    const observer = { observe: (event: OperationalEvent) => events.push(event) };
 
-    const first = await executeAIAnalysis({ modelInfo, provider, repository, request });
-    const second = await executeAIAnalysis({ modelInfo, provider, repository, request });
+    const first = await executeAIAnalysis({ modelInfo, observer, provider, repository, request });
+    const second = await executeAIAnalysis({ modelInfo, observer, provider, repository, request });
 
     expect(first).toMatchObject({
       analysis: { failureCode: "AI_TIMEOUT", retryable: true, status: "FAILED" },
@@ -93,6 +96,20 @@ describe("executeAIAnalysis", () => {
     expect(second).toMatchObject({ created: false, providerCalled: false });
     expect(analyzeSignal).toHaveBeenCalledTimes(1);
     expect(await repository.count()).toBe(1);
+    expect(events).toEqual([
+      expect.objectContaining({
+        correlationId: "correlation-1",
+        failureCode: "AI_TIMEOUT",
+        name: "ai_analysis_completed",
+        providerCalled: true,
+        status: "FAILED",
+      }),
+      expect.objectContaining({
+        name: "ai_analysis_completed",
+        providerCalled: false,
+        status: "FAILED",
+      }),
+    ]);
   });
 
   it("turns provider identity drift into a trusted invalid-response failure", async () => {

@@ -8,6 +8,7 @@ import {
   submitTelegramDeliveryFeedback,
   type DeliveryPort,
   type DigestDeliveryPort,
+  type OperationalObserver,
   type TelegramFeedbackAction,
   type TelegramUiRepositories,
 } from "@radar/application";
@@ -72,6 +73,7 @@ export interface BotControllerOptions {
   readonly digestIdFactory?: () => DigestId;
   readonly messenger: BotMessenger;
   readonly now?: () => string;
+  readonly observer?: OperationalObserver;
   readonly repositories: TelegramUiRepositories;
 }
 
@@ -129,6 +131,7 @@ export class BotController {
   readonly #digestIdFactory: () => DigestId;
   readonly #messenger: BotMessenger;
   readonly #now: () => string;
+  readonly #observer: OperationalObserver | undefined;
   readonly #repositories: TelegramUiRepositories;
 
   constructor(options: BotControllerOptions) {
@@ -141,6 +144,7 @@ export class BotController {
     this.#digestIdFactory = options.digestIdFactory ?? (() => digestId(randomUUID()));
     this.#messenger = options.messenger;
     this.#now = options.now ?? (() => new Date().toISOString());
+    this.#observer = options.observer;
     this.#repositories = options.repositories;
   }
 
@@ -196,6 +200,7 @@ export class BotController {
           digestId: this.#digestIdFactory(),
           kind: "DAILY",
           now: this.#now,
+          ...(this.#observer === undefined ? {} : { observer: this.#observer }),
           port: this.#deliveryPort,
           repositories: this.#repositories,
           telegramUserId: interaction.telegramUserId,
@@ -240,6 +245,7 @@ export class BotController {
         interactionId: interaction.interactionId,
         mode: label === MAIN_MENU.saved ? "SAVED" : "NEW",
         now: this.#now,
+        ...(this.#observer === undefined ? {} : { observer: this.#observer }),
         port: this.#deliveryPort,
         repositories: this.#repositories,
         telegramUserId: interaction.telegramUserId,

@@ -5,6 +5,7 @@ import {
   jobFailureFrom,
   retryDelayMs,
   runJobCycle,
+  type JobRuntimeEvent,
   scheduleBucketStart,
   type EnqueueJobResult,
   type FailJobInput,
@@ -149,6 +150,7 @@ describe("job runtime", () => {
   it("dispatches a claimed job and completes it", async () => {
     const repository = new MemoryJobRepository(scheduledJob());
     const handled: string[] = [];
+    const events: JobRuntimeEvent[] = [];
     const result = await runJobCycle({
       clock: fixedClock(["2026-09-02T10:00:00.000Z", "2026-09-02T10:00:01.000Z"]),
       handlers: {
@@ -158,6 +160,7 @@ describe("job runtime", () => {
         },
       },
       leaseTimeoutMs: 60_000,
+      observer: { observeJob: (event: JobRuntimeEvent) => events.push(event) },
       repository,
       retryPolicy: { baseDelayMs: 1_000, maximumDelayMs: 8_000 },
       staleRecoveryLimit: 10,
@@ -169,6 +172,10 @@ describe("job runtime", () => {
       outcome: "SUCCEEDED",
       job: { attempts: 1, status: "SUCCEEDED" },
     });
+    expect(events).toEqual([
+      expect.objectContaining({ name: "job_started", jobType: "fetchSources" }),
+      expect.objectContaining({ name: "job_completed", outcome: "SUCCEEDED" }),
+    ]);
   });
 
   it("persists retry policy from typed failures", async () => {

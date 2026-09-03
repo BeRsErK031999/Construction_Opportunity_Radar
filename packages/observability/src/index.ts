@@ -6,3 +6,12 @@ export {
   type CreateLoggerOptions,
   type LogLevel,
 } from "./logger.js";
+export {
+  createOperationalTelemetry,
+  InMemoryCounterRegistry,
+  type CounterRegistry,
+  type CounterSample,
+  type CreateOperationalTelemetryOptions,
+  type MetricsSnapshot,
+  type OperationalTelemetry,
+} from "./telemetry.js";

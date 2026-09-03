@@ -164,6 +164,8 @@ Provider failures use stable codes for invalid/oversized input, timeout, unavail
 
 `ART-020` adds an offline evaluator without a second AI domain. Eval items are converted through the same domain constructors and `createAIAnalysisRequest`; source vertical is the only label-derived provider hint, while category and relevance inputs stay neutral and expected labels remain evaluator-only. Returned successful Analysis values must pass `ai-analysis/v1`, request identity/version, and source-union checks before scoring. `ai-benchmark-report/v1` keeps response validity, provider failures, classification, conservative exact-evidence factuality, latency, and optional provider-supplied token/VRAM telemetry distinct. Dataset SHA and every behavior-affecting version are recorded so 8B/14B comparisons cannot silently use different inputs. Fake results prove orchestration only; external model runs remain necessary for Gate G1.
 
+`ART-021` keeps telemetry outside the domain model. Application and job runtime own small typed observer ports; `@radar/observability` is their composition adapter and may use Pino plus a process-local counter registry without becoming an application dependency. Calls are fail-open, so logging or counter failures cannot turn a saved analysis/delivery into a retry. Structured events carry `correlation_id` for entity chains, `source_id` for source summaries and `run_id` for batch summaries. Metric labels are restricted to finite outcome/stage/kind/job-type dictionaries; IDs, model/provider strings, URLs, payloads and user data remain log-only or omitted. PostgreSQL continues to own durable state, while `radar_metrics/v1` is a restart-scoped operational snapshot.
+
 The versioned `SignalAnalysis` contract includes at least:
 
 ```text

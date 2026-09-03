@@ -3,6 +3,7 @@ import { Bot, Keyboard, type Context } from "grammy";
 import {
   type DeliveryPort,
   type DigestDeliveryPort,
+  type OperationalObserver,
   type TelegramUiRepositories,
 } from "@radar/application";
 import { type AppLogger } from "@radar/observability";
@@ -18,6 +19,7 @@ import {
 export interface BuildBotOptions {
   readonly deliveryPort: DeliveryPort & DigestDeliveryPort;
   readonly logger: AppLogger;
+  readonly observer?: OperationalObserver;
   readonly repositories: TelegramUiRepositories;
   readonly token: string;
 }
@@ -64,6 +66,7 @@ export const buildRadarBot = (options: BuildBotOptions): BuiltRadarBot => {
   const controller = new BotController({
     deliveryPort: options.deliveryPort,
     messenger,
+    ...(options.observer === undefined ? {} : { observer: options.observer }),
     repositories: options.repositories,
   });
 
@@ -108,7 +111,7 @@ export const buildRadarBot = (options: BuildBotOptions): BuiltRadarBot => {
 
   bot.catch((error) => {
     options.logger.error(
-      { err: error.error, event: "telegram.update_failed", updateId: error.ctx.update.update_id },
+      { err: error.error, event: "telegram_update_failed", update_id: error.ctx.update.update_id },
       "Telegram update failed",
     );
   });

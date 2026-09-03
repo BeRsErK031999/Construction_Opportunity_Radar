@@ -11,6 +11,10 @@ import {
 
 import { SourceIngestionError } from "./errors.js";
 import {
+  observeOperationalEvent,
+  type OperationalObserver,
+} from "../ports/operational-observer.js";
+import {
   type IngestionIdentityFactory,
   type RawItemRepository,
   type SourceAdapter,
@@ -19,6 +23,7 @@ import {
 export interface IngestSourceInput {
   readonly adapter: SourceAdapter;
   readonly identities: IngestionIdentityFactory;
+  readonly observer?: OperationalObserver;
   readonly rawItems: RawItemRepository;
   readonly source: Source;
 }
@@ -35,7 +40,7 @@ export interface IngestSourceSummary {
 const hashRawText = (rawText: string): string =>
   createHash("sha256").update(rawText, "utf8").digest("hex");
 
-export const ingestSource = async (input: IngestSourceInput): Promise<IngestSourceSummary> => {
+const runIngestion = async (input: IngestSourceInput): Promise<IngestSourceSummary> => {
   const { adapter, identities, rawItems, source } = input;
 
   if (!isSourceCollectionPermitted(source)) {
@@ -90,6 +95,15 @@ export const ingestSource = async (input: IngestSourceInput): Promise<IngestSour
         }),
       );
 
+      observeOperationalEvent(input.observer, {
+        aiProcessingAllowed: isAiProcessingPermitted(source),
+        correlationId: result.item.correlationId,
+        name: "raw_item_ingested",
+        outcome: result.created ? "CREATED" : "EXISTING",
+        rawItemId: result.item.id,
+        sourceId: source.id,
+      });
+
       candidates += 1;
       if (result.created) {
         created += 1;
@@ -113,7 +127,7 @@ export const ingestSource = async (input: IngestSourceInput): Promise<IngestSour
     }
   } while (cursor !== null);
 
-  return Object.freeze({
+  const summary = Object.freeze({
     aiProcessingPermittedRawItemIds: Object.freeze(aiProcessingPermittedRawItemIds),
     candidates,
     created,
@@ -121,4 +135,29 @@ export const ingestSource = async (input: IngestSourceInput): Promise<IngestSour
     fetches,
     sourceId: source.id,
   });
+  observeOperationalEvent(input.observer, {
+    adapter: adapter.name,
+    candidates,
+    created,
+    existing,
+    fetches,
+    name: "source_ingestion_completed",
+    sourceId: source.id,
+  });
+  return summary;
+};
+
+export const ingestSource = async (input: IngestSourceInput): Promise<IngestSourceSummary> => {
+  try {
+    return await runIngestion(input);
+  } catch (error) {
+    observeOperationalEvent(input.observer, {
+      adapter: input.adapter.name,
+      errorCode:
+        error instanceof SourceIngestionError ? error.code : "SOURCE_INGESTION_INTERNAL_ERROR",
+      name: "source_ingestion_failed",
+      sourceId: input.source.id,
+    });
+    throw error;
+  }
 };

@@ -80,9 +80,9 @@ export const startApi = async (options: StartApiOptions): Promise<RunningApi> =>
 
     removeSignalHandlers();
     closePromise = (async () => {
-      logger.info({ event: "api.stopping", reason }, "Stopping API");
+      logger.info({ event: "api_stopping", reason }, "Stopping API");
       await closeWithTimeout(app, config.shutdownTimeoutMs);
-      logger.info({ event: "api.stopped", reason }, "API stopped");
+      logger.info({ event: "api_stopped", reason }, "API stopped");
     })();
 
     return closePromise;
@@ -96,7 +96,7 @@ export const startApi = async (options: StartApiOptions): Promise<RunningApi> =>
       await app.close();
     } catch (closeError) {
       logger.error(
-        { err: closeError, event: "api.start_cleanup_failed" },
+        { err: closeError, event: "api_start_cleanup_failed" },
         "Failed to clean up after API start failure",
       );
     }
@@ -107,7 +107,7 @@ export const startApi = async (options: StartApiOptions): Promise<RunningApi> =>
     for (const signal of SHUTDOWN_SIGNALS) {
       const handler = (): void => {
         void close(signal).catch((error: unknown) => {
-          logger.error({ err: error, event: "api.shutdown_failed", signal }, "API shutdown failed");
+          logger.error({ err: error, event: "api_shutdown_failed", signal }, "API shutdown failed");
           process.exitCode = 1;
         });
       };
@@ -116,7 +116,7 @@ export const startApi = async (options: StartApiOptions): Promise<RunningApi> =>
     }
   }
 
-  logger.info({ address, event: "api.started" }, "API started");
+  logger.info({ address, event: "api_started" }, "API started");
 
   return { address, app, close };
 };
